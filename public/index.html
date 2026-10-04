@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Maya — concept demo</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div id="fixture-banner" class="fixture-banner" hidden>
+      UI fixture — scripted local data. Not OpenAI. Not CAST. Nothing shown here is a real result.
+    </div>
+
+    <header class="topbar">
+      <div class="brand">
+        <span class="avatar avatar-large" aria-hidden="true">M</span>
+        <div>
+          <h1>Maya <span class="brand-note">— concept demo</span></h1>
+          <p class="disclosure">Prototype operating the real CAST website with a test account</p>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <span id="release-lock" class="chip chip-lock" hidden></span>
+        <span id="connection" class="chip chip-warning" hidden></span>
+        <div id="status" class="status" data-tone="neutral">
+          <span id="status-icon" class="status-icon" aria-hidden="true"></span>
+          <span class="status-text">
+            <span class="status-label">CAST redemption</span>
+            <strong id="status-value">Idle</strong>
+          </span>
+        </div>
+        <button id="reconnect" class="button" type="button" hidden>Reconnect</button>
+        <button id="stop" class="button" type="button" disabled>Stop</button>
+        <button id="end" class="button" type="button" disabled>End session</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="chat" aria-label="Conversation with Maya">
+        <div id="timeline" class="timeline" aria-live="polite"></div>
+        <div class="composer-area">
+          <p id="composer-error" class="composer-error" role="alert" hidden></p>
+          <form id="composer" class="composer">
+            <textarea id="message" rows="1" maxlength="2000" placeholder="Message Maya" aria-label="Message Maya"></textarea>
+            <button id="send" class="button button-primary" type="submit">Send</button>
+          </form>
+          <button id="new-session" class="button" type="button" hidden>Start a new session</button>
+        </div>
+      </section>
+
+      <section class="browser" aria-label="Live browser">
+        <div class="browser-head">
+          <div>
+            <h2>Live browser</h2>
+            <p class="browser-note">Live Chromium browser. Take control to interact.</p>
+          </div>
+          <div class="control">
+            <span id="controller" class="chip" hidden></span>
+            <button id="take-control" class="button" type="button" hidden>Take control</button>
+            <button id="return-control" class="button button-primary" type="button" hidden>Return to Maya</button>
+          </div>
+        </div>
+        <div class="viewer-banner">
+          <span id="browser-state" class="chip chip-state" role="status"></span>
+          <span id="address" class="address"></span>
+          <div id="tabs" class="tabs"></div>
+        </div>
+        <div id="viewer" class="viewer">
+          <canvas id="live" class="frame" width="1280" height="800" hidden aria-label="Live view of the browser"></canvas>
+          <div id="viewer-empty" class="viewer-empty"></div>
+        </div>
+        <div class="caption">
+          <p id="caption-main" class="caption-main"></p>
+          <p id="allowed" class="caption-quiet"></p>
+        </div>
+        <div id="filmstrip" class="filmstrip" aria-label="Screenshots the app took after Maya’s actions"></div>
+      </section>
+    </main>
+
+    <section id="drawer" class="drawer" aria-label="Agents API events">
+      <button id="drawer-toggle" class="drawer-toggle" type="button" aria-expanded="false">
+        <span id="drawer-arrow" aria-hidden="true">▸</span>
+        Agents API events
+        <span id="event-count" class="count">0</span>
+        <span class="drawer-legend">
+          <span class="tag tag-api">Agents API</span> session events
+          <span class="tag tag-pw">App · Playwright</span> browser actions run by this app
+          <span class="tag tag-app">App</span> decisions
+          <span class="tag tag-human">Presenter</span> control
+        </span>
+      </button>
+      <div id="drawer-body" class="drawer-body" hidden>
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Time</th>
+              <th scope="col">Source</th>
+              <th scope="col">Type</th>
+              <th scope="col">Summary</th>
+            </tr>
+          </thead>
+          <tbody id="event-rows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <div id="lightbox" class="lightbox" hidden>
+      <img id="lightbox-image" alt="Enlarged screenshot" />
+      <button id="lightbox-close" class="button" type="button">Close</button>
+    </div>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
