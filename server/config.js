@@ -68,7 +68,9 @@ export function readConfig(env = process.env) {
       ]),
     ],
     browserHeadless: value('BROWSER_HEADLESS')?.toLowerCase() !== 'false',
-    browserChannel: value('BROWSER_CHANNEL') ?? 'chromium',
+    // Leave the channel unset by default so Playwright uses its bundled
+    // Chromium executable in local and container deployments.
+    browserChannel: value('BROWSER_CHANNEL'),
     actionTimeoutMs: Number(value('MAYA_ACTION_TIMEOUT_MS')) || 10_000,
     testMode,
     // Locked unless explicitly armed: the CAST test code is single use.

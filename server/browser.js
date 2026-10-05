@@ -131,10 +131,9 @@ export class BrowserSession extends EventEmitter {
   }
 
   async start() {
-    this.#browser = await chromium.launch({
-      headless: this.#config.browserHeadless,
-      channel: this.#config.browserChannel,
-    });
+    const launchOptions = { headless: this.#config.browserHeadless };
+    if (this.#config.browserChannel) launchOptions.channel = this.#config.browserChannel;
+    this.#browser = await chromium.launch(launchOptions);
     this.#browser.on('disconnected', () => {
       if (!this.#closing) this.#lose('The browser process ended unexpectedly.');
     });
