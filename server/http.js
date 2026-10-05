@@ -122,14 +122,20 @@ export function createApp({ config, api, journal, log = () => {}, createBrowser 
   }
 
   function assertSameOrigin(request, port) {
-    const allowedHosts = [`127.0.0.1:${port}`, `localhost:${port}`];
+    const allowedHosts = [`127.0.0.1:${port}`, `localhost:${port}`, ...(config.publicHost ? [config.publicHost] : [])];
     if (!allowedHosts.includes(request.headers.host ?? '')) {
-      throw new ActionError(403, 'bad_host', 'This app only answers on its local address.');
+      throw new ActionError(403, 'bad_host', 'This app is not configured for this host.');
     }
     if (request.method === 'GET' || request.method === 'HEAD') return;
     const origin = request.headers.origin;
-    if (origin !== undefined && !allowedHosts.some((host) => origin === `http://${host}`)) {
-      throw new ActionError(403, 'cross_origin', 'Cross-origin requests are not accepted.');
+    if (origin !== undefined) {
+      let originHost = '';
+      try {
+        originHost = new URL(origin).host;
+      } catch {
+        originHost = '';
+      }
+      if (!allowedHosts.includes(originHost)) throw new ActionError(403, 'cross_origin', 'Cross-origin requests are not accepted.');
     }
     if (request.headers['x-maya-request'] !== '1') {
       throw new ActionError(403, 'missing_header', 'This request did not come from the app.');
