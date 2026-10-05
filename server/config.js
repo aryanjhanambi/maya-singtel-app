@@ -80,6 +80,10 @@ export function readConfig(env = process.env) {
     // never pass for a live OpenAI session.
     fixtureMode: value('MAYA_UI_FIXTURE') === '1' || testMode || baseUrl !== OPENAI_BASE_URL,
     reconnectBaseMs: Number(value('MAYA_RECONNECT_BASE_MS')) || 1000,
+    // Bound concurrent Playwright browsers for a small hosted demo. Each run
+    // remains isolated by its owner cookie and run id.
+    maxSessions: Math.max(1, Number(value('MAYA_MAX_SESSIONS')) || 6),
+    sessionIdleMs: Math.max(60_000, Number(value('MAYA_SESSION_IDLE_MS')) || 30 * 60 * 1000),
     logLevel: value('LOG_LEVEL') ?? 'info',
   };
 }

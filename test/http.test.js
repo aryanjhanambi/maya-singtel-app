@@ -147,7 +147,9 @@ test('the live browser stream, control, and input belong to the browser that own
   ]) {
     assert.equal((await b(method, a.path(suffix), body)).status, 404, `${method} ${suffix}`);
   }
-  assert.equal((await b('POST', '/api/runs', {})).body.error.code, 'run_active');
+  const second = await b('POST', '/api/runs', {});
+  assert.equal(second.status, 201, 'a second owner can start an isolated browser session');
+  assert.notEqual(second.body.run.id, a.runId);
   assert.equal((await client()('POST', '/api/runs', {})).status, 401);
   assert.equal((await a.view()).status.browser.controller, 'human', 'the other browser did not take control back');
 

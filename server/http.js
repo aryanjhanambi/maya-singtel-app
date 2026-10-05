@@ -62,6 +62,7 @@ async function readJson(request) {
  */
 export function createApp({ config, api, journal, log = () => {}, createBrowser }) {
   const runs = new Map();
+  const runAccess = new Map();
   const browserStreams = new Set();
 
   function send(response, status, body, headers = {}) {
@@ -73,7 +74,20 @@ export function createApp({ config, api, journal, log = () => {}, createBrowser 
     response.end(body === undefined ? '' : JSON.stringify(body));
   }
 
-  const activeRun = () => [...runs.values()].find((run) => !run.ended) ?? null;
+  const activeRuns = () => [...runs.values()].filter((run) => !run.ended);
+
+  const cleanupTimer = setInterval(() => {
+    const now = Date.now();
+    for (const run of activeRuns()) {
+      const lastAccess = runAccess.get(run.id) ?? run.createdAt;
+      const status = run.snapshot().status;
+      // Never discard an unresolved redemption outcome automatically; it must
+      // remain available for explicit presenter review.
+      if (now - lastAccess < config.sessionIdleMs || status.turnActive || status.state === 'outcome_unknown') continue;
+      run.end({ force: true }).catch((error) => log('warn', `idle session cleanup failed: ${error?.name ?? 'Error'}`));
+    }
+  }, Math.min(config.sessionIdleMs, 60_000));
+  cleanupTimer.unref?.();
 
   function ownedRun(runId, ownerHash) {
     const run = runs.get(runId);
@@ -277,11 +291,8 @@ export function createApp({ config, api, journal, log = () => {}, createBrowser 
           'OPENAI_API_KEY is not configured. Add it to .env and restart the app. Nothing is simulated without it.',
         );
       }
-      const existing = activeRun();
+      const existing = activeRuns().find((run) => run.ownerHash === ownerHash);
       if (existing) {
-        if (existing.ownerHash !== ownerHash) {
-          throw new ActionError(409, 'run_active', 'Another browser owns the active session.');
-        }
         if (!existing.failed && !existing.browserLost) {
           throw new ActionError(409, 'run_active', 'End the current session first.');
         }
@@ -289,15 +300,20 @@ export function createApp({ config, api, journal, log = () => {}, createBrowser 
         // inspection until the presenter explicitly ends it.
         await existing.end();
       }
+      if (activeRuns().length >= config.maxSessions) {
+        throw new ActionError(429, 'session_limit', `All ${config.maxSessions} browser sessions are currently in use. Try again shortly.`);
+      }
       if (availablePreviousSession(ownerHash)) {
         throw new ActionError(409, 'previous_session_open', 'An earlier session is still open. Choose to keep or delete it first.');
       }
       const run = new Run({ ownerHash, config, api, journal, log, createBrowser });
       runs.set(run.id, run);
+      runAccess.set(run.id, Date.now());
       return send(response, 201, { run: run.snapshot() });
     }
 
     const run = ownedRun(segments[1], ownerHash);
+    runAccess.set(run.id, Date.now());
     const action = segments.slice(2).join('/');
 
     if (method === 'GET' && action === 'stream') return streamRun(request, response, run);
@@ -381,7 +397,9 @@ export function createApp({ config, api, journal, log = () => {}, createBrowser 
     runs,
     browserStreams,
     async close() {
+      clearInterval(cleanupTimer);
       await Promise.all([...runs.values()].map((run) => run.dispose()));
+      runAccess.clear();
       server.closeAllConnections?.();
       await new Promise((resolve) => server.close(resolve));
     },
