@@ -90,10 +90,13 @@ test('code release is locked unless explicitly enabled', () => {
   assert.equal(readConfig({ CODE_RELEASE: 'enabled' }).codeReleaseEnabled, true);
 });
 
-test('config derives the CAST origin, the allow-list, and flags non-OpenAI endpoints', () => {
+test('config defaults to the hosted demo and can be switched to the live CAST flow', () => {
   const config = readConfig({});
-  assert.equal(config.castOrigin, 'https://cast.singtel.com');
-  assert.deepEqual(config.allowedHosts, ['www.singtel.com', 'cast.singtel.com']);
+  assert.equal(config.demoMode, true);
+  assert.equal(config.castOrigin, 'https://aryanjhanambi.github.io');
+  assert.deepEqual(config.allowedHosts, [
+    'www.singtel.com', 'aryanjhanambi.github.io', 'cast.singtel.com', 'manus.im', 'hailuoai.video', 'otter.ai', 'www.minimax.io', 'akool.com',
+  ]);
   assert.equal(config.apiKey, null);
   assert.equal(config.fixtureMode, false);
   assert.equal(config.testMode, false);
@@ -101,6 +104,8 @@ test('config derives the CAST origin, the allow-list, and flags non-OpenAI endpo
   assert.equal(readConfig({ BROWSER_HEADLESS: 'false' }).browserHeadless, false);
   assert.equal(readConfig({ OPENAI_BASE_URL: 'http://127.0.0.1:9/v1' }).fixtureMode, true);
   assert.equal(readConfig({ MAYA_TEST_MODE: '1' }).fixtureMode, true, 'test mode is always labelled');
+  assert.equal(readConfig({ MAYA_DEMO_MODE: 'false' }).demoMode, false);
+  assert.equal(readConfig({ MAYA_DEMO_MODE: 'false' }).castOrigin, 'https://cast.singtel.com');
   assert.equal(normalizeOrigin('https://cast.singtel.com/order/login'), 'https://cast.singtel.com');
 });
 

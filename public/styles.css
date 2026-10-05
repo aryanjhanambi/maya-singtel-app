@@ -16,7 +16,7 @@
   --green-bg: #e5f5eb;
   --green-line: #8ecfa8;
   --slate: #22303f;
-  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font: "Avenir Next", Avenir, "Helvetica Neue", Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
@@ -25,6 +25,10 @@
 }
 
 [hidden] {
+  display: none !important;
+}
+
+.technical-only {
   display: none !important;
 }
 
@@ -191,10 +195,34 @@ summary:focus-visible,
   font-weight: 700;
 }
 
+.avatar-image {
+  overflow: hidden;
+  background: #fff;
+}
+
+.avatar-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 .avatar-large {
-  width: 42px;
-  height: 42px;
+  width: 58px;
+  height: 58px;
+  border: 1px solid #f0f1f3;
+  box-shadow: 0 6px 18px rgba(23, 25, 28, 0.12);
   font-size: 21px;
+}
+
+.online-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: #2bb673;
+  vertical-align: 1px;
 }
 
 /* ---- Top bar ------------------------------------------------------------- */
@@ -214,8 +242,9 @@ summary:focus-visible,
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  padding: 10px 24px;
-  border-top: 4px solid var(--red);
+  min-height: 92px;
+  padding: 15px 40px;
+  border-top: 0;
   border-bottom: 1px solid var(--line);
   background: var(--surface);
 }
@@ -233,7 +262,8 @@ summary:focus-visible,
 }
 
 .brand h1 {
-  font-size: 22px;
+  font-size: 30px;
+  letter-spacing: -0.04em;
   font-weight: 700;
   letter-spacing: -0.01em;
 }
@@ -246,7 +276,7 @@ summary:focus-visible,
 .disclosure {
   overflow: hidden;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 17px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -334,8 +364,13 @@ summary:focus-visible,
 .layout {
   display: grid;
   flex: 1;
-  grid-template-columns: 35fr 65fr;
+  grid-template-columns: 24fr 76fr;
   min-height: 0;
+  transition: grid-template-columns 260ms ease;
+}
+
+body.welcome-layout .topbar-actions {
+  visibility: hidden;
 }
 
 .chat {
@@ -343,21 +378,99 @@ summary:focus-visible,
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  border-right: 1px solid var(--line);
-  background: var(--surface);
+  border-right: 1px solid var(--line-soft);
+  background: radial-gradient(circle at 1px 1px, #eef0f3 1px, transparent 1px) 0 0 / 24px 24px, #fff;
+  transition: opacity 180ms ease;
+}
+
+/* During Maya's guided steps, the browser owns the stage. The conversation
+   returns automatically whenever the customer needs to make a decision. */
+body.welcome-layout .layout {
+  grid-template-columns: 1fr 0;
+}
+
+body.welcome-layout .browser {
+  pointer-events: none;
+  opacity: 0;
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .layout,
+  .chat {
+    transition: none;
+  }
 }
 
 .timeline {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 14px;
+  gap: 30px;
   min-height: 0;
-  padding: 20px 22px;
+  padding: 38px clamp(24px, 7vw, 120px);
   overflow-y: auto;
 }
 
 /* ---- Conversation -------------------------------------------------------- */
+
+.welcome-card {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 880px);
+  align-items: end;
+  gap: 18px;
+  width: min(100%, 1000px);
+  margin: 0 auto;
+}
+
+.welcome-avatar {
+  position: static;
+  width: 64px;
+  height: 64px;
+  border: 1px solid #f0f1f3;
+  border-radius: 50%;
+  background: #fff;
+  padding: 6px;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 12px rgba(23, 25, 28, 0.1));
+}
+
+.welcome-copy {
+  padding: 28px 34px 30px;
+  border: 1px solid var(--line);
+  border-radius: 26px 26px 26px 4px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 12px 32px rgba(23, 25, 28, 0.04);
+}
+
+.eyebrow {
+  display: block;
+  margin-bottom: 20px;
+  color: var(--red);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+}
+
+.welcome-card strong {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--ink);
+  font-size: clamp(25px, 2.4vw, 34px);
+  line-height: 1.15;
+  letter-spacing: -0.04em;
+}
+
+.welcome-card p {
+  color: var(--ink-2);
+  font-size: 18px;
+}
+
+.welcome-card .welcome-hint {
+  margin-top: 22px;
+  color: var(--muted);
+  font-size: 15px;
+}
 
 .intro {
   padding: 16px 18px;
@@ -398,7 +511,10 @@ summary:focus-visible,
 
 .row {
   display: flex;
-  gap: 10px;
+  align-items: flex-end;
+  gap: 16px;
+  width: min(100%, 1080px);
+  margin-inline: auto;
 }
 
 .row-customer {
@@ -406,22 +522,26 @@ summary:focus-visible,
 }
 
 .bubble {
-  max-width: 84%;
-  padding: 10px 14px;
-  border-radius: 16px;
+  max-width: 76%;
+  padding: 22px 28px;
+  border-radius: 26px;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
 
 .bubble-customer {
+  max-width: 52%;
   border-bottom-right-radius: 4px;
-  background: #e9ecf0;
+  background: var(--red);
+  color: #fff;
+  box-shadow: 0 8px 16px rgba(215, 16, 47, 0.16);
 }
 
 .bubble-maya {
   border: 1px solid var(--line);
-  border-top-left-radius: 4px;
+  border-bottom-left-radius: 4px;
   background: var(--surface);
+  box-shadow: 0 8px 24px rgba(23, 25, 28, 0.05);
 }
 
 .notice {
@@ -493,7 +613,6 @@ summary:focus-visible,
 
 .card[data-status="pending"] {
   border-color: #c9ced5;
-  border-left: 4px solid var(--red);
 }
 
 .card-head {
@@ -729,7 +848,7 @@ textarea {
 
 .composer-area {
   flex: none;
-  padding: 12px 22px 16px;
+  padding: 20px clamp(24px, 3vw, 48px) 26px;
   border-top: 1px solid var(--line);
   background: var(--surface);
 }
@@ -737,12 +856,82 @@ textarea {
 .composer {
   display: flex;
   align-items: flex-end;
-  gap: 10px;
+  gap: 12px;
+  padding: 8px 9px 8px 20px;
+  border: 2px solid #f4a5b3;
+  border-radius: 28px;
+  box-shadow: 0 0 0 6px rgba(215, 16, 47, 0.04);
 }
 
 .composer textarea {
+  flex: 1;
+  min-height: 52px;
+  padding: 13px 4px;
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
   max-height: 140px;
   resize: none;
+}
+
+.composer .button-primary {
+  min-width: 76px;
+  min-height: 52px;
+  padding-inline: 18px;
+  border-radius: 20px;
+}
+
+body:not(.welcome-layout) .timeline {
+  gap: 16px;
+  padding: 18px 14px;
+}
+
+body:not(.welcome-layout) .row {
+  gap: 8px;
+}
+
+body:not(.welcome-layout) .row .avatar {
+  width: 30px;
+  height: 30px;
+}
+
+body:not(.welcome-layout) .bubble {
+  max-width: calc(100% - 38px);
+  padding: 12px 14px;
+  border-radius: 16px;
+  font-size: 15px;
+}
+
+body:not(.welcome-layout) .bubble-customer {
+  max-width: 88%;
+  border-bottom-right-radius: 4px;
+}
+
+body:not(.welcome-layout) .composer-area {
+  padding: 12px;
+}
+
+body:not(.welcome-layout) .composer {
+  padding: 5px 5px 5px 11px;
+  border-width: 1px;
+  border-radius: 18px;
+  box-shadow: none;
+}
+
+body:not(.welcome-layout) .composer textarea {
+  min-height: 40px;
+  padding: 8px 2px;
+  font-size: 15px;
+}
+
+body:not(.welcome-layout) .composer .button-primary {
+  min-width: 58px;
+  min-height: 40px;
+  padding-inline: 10px;
+  border-radius: 13px;
+  font-size: 14px;
 }
 
 .composer textarea:disabled {
@@ -854,6 +1043,28 @@ textarea {
   flex: none;
   align-items: center;
   gap: 8px;
+}
+
+#take-control.attention-pulse {
+  min-width: 150px;
+  padding: 13px 22px;
+  border-color: var(--red);
+  background: var(--red);
+  color: #fff;
+  font-size: 17px;
+  box-shadow: 0 8px 20px rgba(215, 16, 47, 0.24);
+  animation: take-control-bounce 1.35s ease-in-out infinite;
+}
+
+@keyframes take-control-bounce {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-4px) scale(1.04); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #take-control.attention-pulse {
+    animation: none;
+  }
 }
 
 .address {
@@ -1095,4 +1306,73 @@ textarea {
   position: absolute;
   top: 16px;
   right: 16px;
+}
+
+@media (max-width: 760px) {
+  body {
+    font-size: 16px;
+  }
+
+  .topbar {
+    padding: 12px 16px;
+  }
+
+  .topbar-actions {
+    gap: 6px;
+  }
+
+  .topbar-actions .status,
+  .topbar-actions #stop,
+  .topbar-actions #end {
+    display: none;
+  }
+
+  .brand h1 {
+    font-size: 23px;
+  }
+
+  .disclosure {
+    font-size: 14px;
+  }
+
+  .layout,
+  body.welcome-layout .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .browser {
+    min-height: 48vh;
+  }
+
+  body.welcome-layout .browser {
+    display: none;
+  }
+
+  .welcome-card {
+    grid-template-columns: 52px minmax(0, 1fr);
+    gap: 10px;
+    min-height: 0;
+    padding: 0;
+  }
+
+  .welcome-avatar {
+    position: static;
+    width: 48px;
+    height: 48px;
+    margin-right: 0;
+    flex: none;
+    transform: none;
+  }
+
+  .welcome-copy {
+    padding: 22px;
+  }
+
+  .welcome-card strong {
+    font-size: 27px;
+  }
+
+  .bubble {
+    max-width: 90%;
+  }
 }

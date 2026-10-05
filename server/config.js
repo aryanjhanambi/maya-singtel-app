@@ -5,6 +5,11 @@ import { fileURLToPath } from 'node:url';
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const OPENAI_BASE_URL = 'https://api.openai.com/v1';
+const SINGTEL_AI_PASS_URL = 'https://www.singtel.com/personal/products-services/lifestyle-services/ai-pass';
+const DEMO_START_URL = 'https://aryanjhanambi.github.io/singtel_demos/';
+const DEMO_ENTITLEMENT_URL = 'https://aryanjhanambi.github.io/singtel_demos/ai-pass.html';
+const DEMO_PARTNER_HOSTS = ['manus.im', 'hailuoai.video', 'otter.ai', 'www.minimax.io', 'akool.com'];
+const DEMO_TRANSITION_HOSTS = ['cast.singtel.com'];
 
 /** Loads .env if present. Variables already in the environment win. */
 export function loadEnvFile(file = path.join(ROOT, '.env')) {
@@ -29,23 +34,26 @@ export function normalizeOrigin(value) {
 export function readConfig(env = process.env) {
   const value = (name) => env[name]?.trim() || null;
   const baseUrl = (value('OPENAI_BASE_URL') ?? OPENAI_BASE_URL).replace(/\/+$/, '');
+  // Test mode uses the local fixture's guarded code-submission path.
+  const testMode = value('MAYA_TEST_MODE') === '1';
+  // The hosted simulation is the safe default. Set MAYA_DEMO_MODE=false only
+  // when deliberately using the real CAST test flow.
+  const demoMode = !testMode && value('MAYA_DEMO_MODE')?.toLowerCase() !== 'false';
   const expectedRedeemUrl =
     value('EXPECTED_REDEEM_URL') ??
-    'https://cast.singtel.com/order/login?redirectIntent=voucherRedemption';
+    (demoMode ? DEMO_ENTITLEMENT_URL : 'https://cast.singtel.com/order/login?redirectIntent=voucherRedemption');
   const startUrl =
     value('START_URL') ??
-    'https://www.singtel.com/personal/products-services/lifestyle-services/ai-pass';
-  // Test mode lets automated tests use a plain-HTTP local page. It always
-  // labels the UI as a fixture.
-  const testMode = value('MAYA_TEST_MODE') === '1';
+    (demoMode ? SINGTEL_AI_PASS_URL : SINGTEL_AI_PASS_URL);
   return {
     // The only origin on which the app will release the test code.
     castOrigin: new URL(expectedRedeemUrl).origin,
     apiKey: value('OPENAI_API_KEY'),
     baseUrl,
     model: value('OPENAI_AGENT_MODEL') ?? 'gpt-6-astra',
-    host: '127.0.0.1',
+    host: value('HOST') ?? '127.0.0.1',
     port: Number(value('PORT')) || 4310,
+    demoMode,
     startUrl,
     expectedRedeemUrl,
     // Hosts Maya's tools may open, read, and click on. The presenter can go
@@ -54,6 +62,7 @@ export function readConfig(env = process.env) {
       ...new Set([
         new URL(startUrl).host,
         new URL(expectedRedeemUrl).host,
+        ...(demoMode ? [new URL(DEMO_START_URL).host, ...DEMO_TRANSITION_HOSTS, ...DEMO_PARTNER_HOSTS] : []),
         ...(value('ALLOWED_HOSTS') ?? '').split(',').map((host) => host.trim()).filter(Boolean),
       ]),
     ],

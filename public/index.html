@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Maya — concept demo</title>
+    <title>Maya | Singtel AI Pass</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
@@ -14,19 +14,21 @@
 
     <header class="topbar">
       <div class="brand">
-        <span class="avatar avatar-large" aria-hidden="true">M</span>
+        <span class="avatar avatar-large avatar-image" aria-hidden="true">
+          <img src="/assets/maya-avatar.png" alt="" />
+        </span>
         <div>
-          <h1>Maya <span class="brand-note">— concept demo</span></h1>
-          <p class="disclosure">Prototype operating the real CAST website with a test account</p>
+          <h1>Ask Maya</h1>
+          <p class="disclosure"><span class="online-dot" aria-hidden="true"></span> Singtel AI Pass assistant</p>
         </div>
       </div>
       <div class="topbar-actions">
-        <span id="release-lock" class="chip chip-lock" hidden></span>
+        <span id="release-lock" class="chip chip-lock technical-only" hidden></span>
         <span id="connection" class="chip chip-warning" hidden></span>
         <div id="status" class="status" data-tone="neutral">
           <span id="status-icon" class="status-icon" aria-hidden="true"></span>
           <span class="status-text">
-            <span class="status-label">CAST redemption</span>
+            <span class="status-label">Singtel AI Pass</span>
             <strong id="status-value">Idle</strong>
           </span>
         </div>
@@ -42,18 +44,18 @@
         <div class="composer-area">
           <p id="composer-error" class="composer-error" role="alert" hidden></p>
           <form id="composer" class="composer">
-            <textarea id="message" rows="1" maxlength="2000" placeholder="Message Maya" aria-label="Message Maya"></textarea>
+            <textarea id="message" rows="1" maxlength="2000" placeholder="Ask Maya anything…" aria-label="Message Maya"></textarea>
             <button id="send" class="button button-primary" type="submit">Send</button>
           </form>
           <button id="new-session" class="button" type="button" hidden>Start a new session</button>
         </div>
       </section>
 
-      <section class="browser" aria-label="Live browser">
+      <section class="browser" aria-label="Secure browser">
         <div class="browser-head">
           <div>
-            <h2>Live browser</h2>
-            <p class="browser-note">Live Chromium browser. Take control to interact.</p>
+            <h2>Your secure browser</h2>
+            <p class="browser-note">Use Take control whenever you need to sign in or continue.</p>
           </div>
           <div class="control">
             <span id="controller" class="chip" hidden></span>
@@ -70,18 +72,18 @@
           <canvas id="live" class="frame" width="1280" height="800" hidden aria-label="Live view of the browser"></canvas>
           <div id="viewer-empty" class="viewer-empty"></div>
         </div>
-        <div class="caption">
+        <div class="caption technical-only">
           <p id="caption-main" class="caption-main"></p>
           <p id="allowed" class="caption-quiet"></p>
         </div>
-        <div id="filmstrip" class="filmstrip" aria-label="Screenshots the app took after Maya’s actions"></div>
+        <div id="filmstrip" class="filmstrip technical-only" aria-label="Screenshots the app took after Maya’s actions"></div>
       </section>
     </main>
 
-    <section id="drawer" class="drawer" aria-label="Agents API events">
+    <section id="drawer" class="drawer technical-only" aria-label="Session activity">
       <button id="drawer-toggle" class="drawer-toggle" type="button" aria-expanded="false">
         <span id="drawer-arrow" aria-hidden="true">▸</span>
-        Agents API events
+        Activity details
         <span id="event-count" class="count">0</span>
         <span class="drawer-legend">
           <span class="tag tag-api">Agents API</span> session events

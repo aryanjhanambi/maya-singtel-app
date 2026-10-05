@@ -35,7 +35,7 @@ async function start(t) {
 const pending = (promise) => Promise.race([promise.then(() => false, () => false), settle(150).then(() => true)]);
 
 test('the address policy allows only secure pages on listed hosts', () => {
-  const config = readConfig({});
+  const config = readConfig({ MAYA_DEMO_MODE: 'false' });
   assert.equal(agentMayUse('https://cast.singtel.com/order/login', config), true);
   assert.equal(agentMayUse('https://www.singtel.com/personal', config), true);
   assert.equal(agentMayUse('http://cast.singtel.com/order/login', config), false);
@@ -43,7 +43,7 @@ test('the address policy allows only secure pages on listed hosts', () => {
   assert.equal(agentMayUse('https://example.com/', config), false);
   assert.equal(agentMayUse('javascript:alert(1)', config), false);
   assert.equal(agentMayUse('not a url', config), false);
-  const extra = readConfig({ ALLOWED_HOSTS: 'login.example.net' });
+  const extra = readConfig({ MAYA_DEMO_MODE: 'false', ALLOWED_HOSTS: 'login.example.net' });
   assert.equal(agentMayUse('https://login.example.net/', extra), true);
 });
 

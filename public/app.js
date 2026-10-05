@@ -4,6 +4,9 @@
 
 const $ = (id) => document.getElementById(id);
 
+// Set to false to show the browser alongside the welcome chat immediately.
+const WELCOME_CHAT_LAYOUT = true;
+
 const ICONS = {
   dot: '<circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/>',
   spinner: '<path d="M21 12a9 9 0 1 1-6.2-8.6"/>',
@@ -45,6 +48,7 @@ const RESULT_TITLES = {
   unknown: ['Result not yet confirmed', 'question'],
 };
 
+// Kept for the hidden activity log so event rendering remains safe.
 const SOURCE_TAGS = { 'Agents API': 'tag-api', 'App · Playwright': 'tag-pw', Presenter: 'tag-human' };
 
 const NAMED_KEYS = new Set([
@@ -211,6 +215,8 @@ function renderStatus() {
   // Cards cannot be answered while what they show may be out of date.
   $('timeline').inert = offline;
 
+  renderPresentationLayout();
+
   // The browser panel repeats the same state in its own row.
   const waiting = !offline && (state === 'needs_input' || state === 'ready_to_redeem');
   const panelState = $('browser-state');
@@ -222,11 +228,17 @@ function renderStatus() {
   refreshActivityLabels();
 }
 
+/** Starts with a focused welcome, then makes the browser the main stage. */
+function renderPresentationLayout() {
+  const welcome = WELCOME_CHAT_LAYOUT && !app.runId && !app.previous;
+  document.body.classList.toggle('welcome-layout', welcome);
+}
+
 function renderComposer() {
   const state = currentState();
   const status = app.status;
   let disabled = false;
-  let placeholder = 'Message Maya';
+  let placeholder = 'Ask Maya anything…';
   if (appOffline()) {
     disabled = true;
     placeholder = 'Reconnecting to the app…';
@@ -267,14 +279,14 @@ function renderBrowser() {
   if (!live) {
     const [title, text] =
       state === 'setup'
-        ? ['No browser session', 'Nothing is simulated. Add an API key to run Maya.']
+        ? ['Getting ready', 'Maya is preparing your AI Pass journey.']
         : state === 'ended'
           ? ['Browser closed', 'The browser closed with the session and its private data was discarded.']
           : browser.lost
             ? ['Browser closed unexpectedly', 'It was not replaced. End the session when ready.']
             : browser.running
               ? ['Starting the live view', 'Waiting for the first frame from the browser.']
-              : ['The live browser appears here', 'When Maya starts, this shows the browser as it runs, and you can take control of it.'];
+              : ['Your browser appears here', 'Maya will guide you through each step, and you can take control whenever needed.'];
     empty.replaceChildren(el('strong', { text: title }), text);
   }
 
@@ -295,6 +307,11 @@ function renderBrowser() {
       : 'Maya is controlling the browser';
   $('take-control').hidden = !browser.running || human;
   $('take-control').disabled = offline;
+  const activeCard = app.status?.activeCardId ? app.entries.get(app.status.activeCardId) : null;
+  $('take-control').classList.toggle(
+    'attention-pulse',
+    !human && activeCard?.card === 'takeover' && activeCard.status === 'pending',
+  );
   $('return-control').hidden = !browser.running || !human;
   $('return-control').disabled = offline;
 
@@ -307,8 +324,7 @@ function renderBrowser() {
         )
       : []),
   );
-  const hosts = app.status?.allowedHosts ?? app.config?.allowedHosts ?? [];
-  $('allowed').textContent = hosts.length ? `Maya may use: ${hosts.join(', ')}` : '';
+  $('allowed').textContent = '';
   if (!inControl()) {
     app.input.length = 0;
     app.buttonsDown.clear();
@@ -555,13 +571,14 @@ function renderIntro() {
       app.previous && previousCard(app.previous),
       !app.previous &&
         el(
-          'div',
-          { class: 'intro', id: 'intro' },
-          el('strong', { text: 'Ask Maya to start' }),
-          el('p', { text: 'For example: “Can you help me redeem my Singtel AI Pass on CAST?”' }),
-          el('p', {
-            text: 'Maya works in a Chromium browser that this app runs and shows live on the right, on the real Singtel and CAST websites. You sign in yourself by taking control of that browser, never in this chat.',
-          }),
+          'div', { class: 'welcome-card', id: 'intro' },
+          el('img', { class: 'welcome-avatar', src: '/assets/maya-avatar.png', alt: '' }),
+          el('div', { class: 'welcome-copy' },
+            el('span', { class: 'eyebrow', text: 'HELLO THERE' }),
+            el('strong', { text: 'I’m Maya, your Singtel AI Pass assistant.' }),
+            el('p', { text: 'I’m here to guide you through your AI Pass redemption journey.' }),
+            el('p', { class: 'welcome-hint', text: 'Tell me what you would like help with to get started.' }),
+          ),
         ),
     ].filter(Boolean),
   );
@@ -575,7 +592,9 @@ function createEntryNode(entry) {
       return el(
         'div',
         { class: 'row' },
-        el('span', { class: 'avatar', 'aria-hidden': 'true', text: 'M' }),
+        el('span', { class: 'avatar avatar-image', 'aria-hidden': 'true' },
+          el('img', { src: '/assets/maya-avatar.png', alt: '' }),
+        ),
         el('div', { class: 'bubble bubble-maya', text: entry.text }),
       );
     case 'notice':
@@ -634,7 +653,7 @@ function renderActivity(node, entry) {
   const count = `${entry.stepIds.length} step${entry.stepIds.length === 1 ? '' : 's'}`;
   node.querySelector('summary').replaceChildren(
     icon(working ? 'spinner' : 'browser', 'activity-icon'),
-    working ? `Maya is working in the browser · ${count}` : `Browser activity · ${count}`,
+    working ? 'Maya is getting things ready' : 'Journey progress',
   );
   node.querySelector('ol').replaceChildren(
     ...steps.map((step) => el('li', { text: `${step.title}${step.status === 'completed' ? '' : ` (${step.status.replace('_', ' ')})`}` })),
@@ -673,7 +692,6 @@ function createCard(entry) {
       { class: 'card-head' },
       el('span', { class: 'card-icon' }, icon(iconName)),
       el('h3', { class: 'card-title', text: title }),
-      el('span', { class: `tag ${SOURCE_TAGS[entry.source] ?? 'tag-app'}`, text: entry.source }),
     ),
     el('div', { class: 'card-body' }),
   );
@@ -692,8 +710,7 @@ function syncCard(node, entry) {
 function takeoverBody(entry) {
   const parts = [
     entry.reason && el('p', { text: entry.reason }),
-    entry.address && el('p', { class: 'card-muted', text: 'Page in the browser when Maya asked' }),
-    entry.address && el('div', { class: 'destination', text: entry.address }),
+    el('p', { class: 'card-muted', text: 'You’ll complete this step securely in the browser.' }),
   ];
   if (entry.status !== 'pending') return [...parts, outcomeLine(entry.outcome)].filter(Boolean);
   return [
@@ -702,13 +719,13 @@ function takeoverBody(entry) {
       'ol',
       { class: 'steps-list' },
       el('li', {}, 'Select ', el('strong', { text: 'Take control' }), ' above the browser.'),
-      el('li', { text: 'Sign in on the page yourself, including the code sent to your phone.' }),
+      el('li', { text: 'Sign in or enter your code directly on the page.' }),
       el('li', {}, 'Select ', el('strong', { text: 'Return to Maya' }), '.'),
     ),
     replyHint('Or type', ['cancel'], 'to decline.'),
     el('p', {
       class: 'provenance',
-      text: 'While you have control, Maya is paused. What you type goes straight to the website in this browser. It is not sent to Maya’s model and is not stored or logged by this app.',
+      text: 'While you have control, Maya waits. Your details stay in the browser and are not shared in this chat.',
     }),
   ].filter(Boolean);
 }
@@ -734,7 +751,7 @@ function releaseBody(entry) {
   if (entry.locked) {
     return [
       facts,
-      el('p', { class: 'callout' }, 'Rehearsal: code release is locked, so the app does not accept a test code and the run stops at this form.'),
+      el('p', { class: 'callout' }, 'Code submission is unavailable for this session.'),
       replyHint('Reply', ['cancel'], 'to tell Maya to stop here, or select Stop.'),
     ];
   }
@@ -1124,7 +1141,7 @@ async function init() {
   }
   $('fixture-banner').hidden = !app.config.fixture;
   if (app.config.codeRelease === 'locked') {
-    $('release-lock').replaceChildren(icon('lock'), 'Rehearsal · code release locked');
+    $('release-lock').replaceChildren(icon('lock'), 'Secure redemption');
     $('release-lock').hidden = false;
   }
   renderIntro();

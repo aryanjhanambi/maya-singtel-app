@@ -15,6 +15,8 @@ const STATIC_FILES = {
   '/app.js': ['app.js', 'text/javascript; charset=utf-8'],
   '/styles.css': ['styles.css', 'text/css; charset=utf-8'],
   '/favicon.svg': ['favicon.svg', 'image/svg+xml'],
+  '/assets/maya-avatar.png': ['assets/maya-avatar.png', 'image/png'],
+  '/assets/chatbot-avatar.png': ['assets/chatbot-avatar.png', 'image/png'],
 };
 const SECURITY_HEADERS = {
   'Cache-Control': 'no-store',
@@ -103,6 +105,20 @@ export function createApp({ config, api, journal, log = () => {}, createBrowser 
       codeUsed: Boolean(last),
       outcome: last ? (last.outcome ?? 'unknown') : null,
     };
+  }
+
+  /**
+   * A browser is intentionally not resumed after an app restart. In the
+   * consumer journey, a stale session that never submitted a code is safe to
+   * keep remotely and dismiss locally, without interrupting the next visit.
+   * Anything with a possible submission remains visible for an explicit
+   * decision.
+   */
+  function availablePreviousSession(ownerHash) {
+    const previous = previousSession(ownerHash);
+    if (!config.demoMode || !previous || previous.codeUsed) return previous;
+    journal.save({ ...journal.get(previous.id), endedAt: Date.now(), closedBy: 'dismissed' });
+    return null;
   }
 
   function assertSameOrigin(request, port) {
@@ -244,7 +260,7 @@ export function createApp({ config, api, journal, log = () => {}, createBrowser 
 
     if (segments.length === 2 && segments[1] === 'current' && method === 'GET') {
       const run = [...runs.values()].find((candidate) => candidate.ownerHash === ownerHash && !candidate.ended);
-      return send(response, 200, { run: run ? run.snapshot() : null, previous: previousSession(ownerHash) });
+      return send(response, 200, { run: run ? run.snapshot() : null, previous: availablePreviousSession(ownerHash) });
     }
 
     if (segments.length === 1 && method === 'POST') {
@@ -267,7 +283,7 @@ export function createApp({ config, api, journal, log = () => {}, createBrowser 
         // inspection until the presenter explicitly ends it.
         await existing.end();
       }
-      if (previousSession(ownerHash)) {
+      if (availablePreviousSession(ownerHash)) {
         throw new ActionError(409, 'previous_session_open', 'An earlier session is still open. Choose to keep or delete it first.');
       }
       const run = new Run({ ownerHash, config, api, journal, log, createBrowser });

@@ -10,6 +10,7 @@ import { BROWSER_TOOLS, RESULT_OUTCOMES, TOOL } from './tools.js';
 const MAX_STORED_IMAGES = 240;
 const MAX_DRAWER_ROWS = 1500;
 const MAX_RECONNECT_ATTEMPTS = 5;
+const DEMO_START_URL = 'https://aryanjhanambi.github.io/singtel_demos/';
 
 // Where a drawer row or card comes from. Browser actions are executed by this
 // app through Playwright; they are not OpenAI-hosted computer use.
@@ -88,6 +89,7 @@ export class Run {
   #sequence = 0;
   #lastStatus = '';
   #journalWarned = false;
+  #autoTransitioning = false;
   #createBrowser;
 
   constructor({ id = randomUUID(), ownerHash, config, api, journal, log = () => {}, createBrowser }) {
@@ -407,6 +409,7 @@ export class Run {
     browser.on('state', () => {
       this.#touch();
       this.#broadcastBrowser({ t: 'state', state: this.browserState() });
+      void this.#maybeAutoTransitionAfterLogin();
     });
     browser.on('frame', (frame) => this.#broadcastBrowser({ t: 'frame', frame }));
     browser.on('note', (text) => this.#notice(text, 'info'));
@@ -424,6 +427,49 @@ export class Run {
     }
     this.browser = browser;
     return true;
+  }
+
+  /**
+   * In the hosted demo, a successful CAST OTP sign-in changes the page away
+   * from the login route. That navigation is enough to continue; the OTP
+   * itself is never read. Returning control and opening the duplicated page
+   * here removes the extra manual handoff from the presenter.
+   */
+  async #maybeAutoTransitionAfterLogin() {
+    if (this.#autoTransitioning || !this.config.demoMode || !this.browser) return;
+    if (this.browser.controller !== 'human' || !this.#pending('takeover').length) return;
+    let url;
+    try {
+      url = new URL(this.browser.address());
+    } catch {
+      return;
+    }
+    if (url.host !== 'cast.singtel.com' || /\/login(?:[/?#]|$)/i.test(url.pathname)) return;
+
+    this.#autoTransitioning = true;
+    try {
+      await this.browser.returnControl();
+      await this.browser.navigate(DEMO_START_URL);
+      this.#row(APP, 'journey.auto_transition', 'Successful sign-in detected; opened the hosted AI Pass page');
+      this.#notice('Your sign-in is complete. Maya is continuing with the AI Pass page.', 'info');
+      for (const card of this.#pending('takeover')) {
+        card.status = 'answered';
+        card.outcome = 'Sign-in detected';
+        this.#updateEntry(card);
+        const call = this.#cardMeta.get(card.id)?.call;
+        if (call) {
+          void this.#deliver(call, {
+            success: true,
+            output: 'The sign-in completed and the app already opened the hosted AI Pass page. Continue from there; do not ask the customer to return control.',
+          });
+        }
+      }
+      this.#touch();
+    } catch {
+      // If the redirect is incomplete or the browser closes, leave the normal
+      // Take control / Return to Maya flow available to the presenter.
+      this.#autoTransitioning = false;
+    }
   }
 
   /**
@@ -998,6 +1044,12 @@ export class Run {
   }
 
   async #openSubmissionCard(call) {
+    if (this.config.demoMode) {
+      return this.#deliver(call, {
+        success: false,
+        error: "This page does not require a voucher code. Select Redeem, then Continue to AI Pass to proceed.",
+      });
+    }
     const args = parseArguments(call.action.arguments);
     const decline = (noticeText, agentError) => {
       this.#notice(noticeText, 'warning');
