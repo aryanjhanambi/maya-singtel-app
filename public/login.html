@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sign in | Maya</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/login.css" />
+  </head>
+  <body>
+    <main class="login-shell">
+      <section class="login-card" aria-labelledby="login-title">
+        <img class="maya-avatar" src="/assets/maya-avatar.png" alt="" />
+        <p class="eyebrow">SINGTEL AI PASS</p>
+        <h1 id="login-title">Welcome to Maya</h1>
+        <p class="intro">Enter the access password to continue to your AI Pass assistant.</p>
+        <form id="login-form">
+          <label for="password">Password</label>
+          <div class="password-row">
+            <input id="password" name="password" type="password" autocomplete="current-password" required autofocus />
+            <button id="toggle-password" class="toggle" type="button" aria-label="Show password">Show</button>
+          </div>
+          <p id="error" class="error" role="alert" hidden></p>
+          <button id="submit" class="submit" type="submit">Continue</button>
+        </form>
+        <p class="privacy">Your password is checked securely by the Maya server.</p>
+      </section>
+    </main>
+    <script type="module" src="/login.js"></script>
+  </body>
+</html>

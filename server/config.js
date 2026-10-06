@@ -53,6 +53,7 @@ export function readConfig(env = process.env) {
     model: value('OPENAI_AGENT_MODEL') ?? 'gpt-6-astra',
     host: value('HOST') ?? '127.0.0.1',
     publicHost: value('PUBLIC_HOST'),
+    accessPassword: value('MAYA_ACCESS_PASSWORD'),
     port: Number(value('PORT')) || 4310,
     demoMode,
     startUrl,

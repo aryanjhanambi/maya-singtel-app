@@ -8,13 +8,13 @@ import { createApp } from '../server/http.js';
 import { MemoryJournal } from '../server/store.js';
 import { FIXTURE_CODE, TOOL_RESULT, startWorld, waitFor } from './helpers.js';
 
-async function startApp(t, { configured = true, armed = false } = {}) {
+async function startApp(t, { configured = true, armed = false, accessPassword = null } = {}) {
   const world = await startWorld(t, { armed });
   const { fixture, config } = world;
   const logs = [];
   const journal = new MemoryJournal();
   const app = createApp({
-    config: configured ? config : readConfig({ MAYA_DATA_DIR: '/nonexistent-unused' }),
+    config: configured ? { ...config, accessPassword } : readConfig({ MAYA_DATA_DIR: '/nonexistent-unused' }),
     api: configured ? createAgentsApi({ apiKey: config.apiKey, baseUrl: config.baseUrl }) : null,
     journal,
     log: (level, message) => logs.push(`${level} ${message}`),
@@ -25,7 +25,7 @@ async function startApp(t, { configured = true, armed = false } = {}) {
 
   /** A browser-like client with its own cookie jar. */
   function client() {
-    let cookie = null;
+    const cookies = new Map();
     const call = (method, path, body, headers = {}) =>
       new Promise((resolve, reject) => {
         const payload = body === undefined ? null : typeof body === 'string' ? body : JSON.stringify(body);
@@ -36,7 +36,7 @@ async function startApp(t, { configured = true, armed = false } = {}) {
             method,
             path,
             headers: {
-              ...(cookie ? { Cookie: cookie } : {}),
+              ...(cookies.size ? { Cookie: [...cookies].map(([key, value]) => `${key}=${value}`).join('; ') } : {}),
               ...(method === 'GET' ? {} : { 'X-Maya-Request': '1', 'Content-Type': 'application/json' }),
               ...headers,
             },
@@ -50,8 +50,11 @@ async function startApp(t, { configured = true, armed = false } = {}) {
               if (isStream && !response.timer) response.timer = setTimeout(() => response.destroy(), 700);
             });
             const finish = () => {
-              const setCookie = response.headers['set-cookie']?.[0];
-              if (setCookie) cookie = setCookie.split(';')[0];
+              for (const setCookie of response.headers['set-cookie'] ?? []) {
+                const [pair] = setCookie.split(';');
+                const [key, ...value] = pair.split('=');
+                cookies.set(key, value.join('='));
+              }
               const raw = Buffer.concat(chunks);
               const isJson = (response.headers['content-type'] ?? '').includes('application/json');
               resolve({ status: response.statusCode, headers: response.headers, body: isJson && raw.length ? JSON.parse(raw.toString('utf8')) : raw.toString('utf8') });
@@ -64,7 +67,7 @@ async function startApp(t, { configured = true, armed = false } = {}) {
         if (payload) request.write(payload);
         request.end();
       });
-    call.ownerHash = () => createHash('sha256').update(cookie.split('=')[1]).digest('hex');
+    call.ownerHash = () => createHash('sha256').update(cookies.get('maya_owner')).digest('hex');
     return call;
   }
 
@@ -88,6 +91,26 @@ async function startApp(t, { configured = true, armed = false } = {}) {
 
   return { ...world, app, client, owner, logs, journal, port };
 }
+
+test('the password gate protects Maya and sets a server-only authentication cookie', async (t) => {
+  const { client } = await startApp(t, { accessPassword: 'correct-horse-battery-staple' });
+  const call = client();
+
+  const landing = await call('GET', '/');
+  assert.equal(landing.status, 302);
+  assert.equal(landing.headers.location, '/login');
+  assert.equal((await call('GET', '/login')).status, 200);
+
+  const wrong = await call('POST', '/api/auth/login', { password: 'wrong' });
+  assert.equal(wrong.status, 401);
+  assert.equal(wrong.body.error.code, 'invalid_password');
+
+  const login = await call('POST', '/api/auth/login', { password: 'correct-horse-battery-staple' });
+  assert.equal(login.status, 200);
+  assert.match(login.headers['set-cookie'][0], /HttpOnly/);
+  assert.equal((await call('GET', '/')).status, 200);
+  assert.equal((await call('GET', '/api/config')).status, 200);
+});
 
 test('without an API key the app reports setup, starts no browser, and contacts nothing', async (t) => {
   const { client, fixture, app } = await startApp(t, { configured: false });

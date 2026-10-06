@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import path from 'node:path';
@@ -7,11 +7,15 @@ import { ROOT } from './config.js';
 import { ActionError, ENGINE, Run } from './run.js';
 
 const OWNER_COOKIE = 'maya_owner';
+const AUTH_COOKIE = 'maya_auth';
 const MAX_BODY_BYTES = 128 * 1024;
 const MIN_FRAME_INTERVAL_MS = 66;
 const PUBLIC_DIR = path.join(ROOT, 'public');
 const STATIC_FILES = {
   '/': ['index.html', 'text/html; charset=utf-8'],
+  '/login': ['login.html', 'text/html; charset=utf-8'],
+  '/login.js': ['login.js', 'text/javascript; charset=utf-8'],
+  '/login.css': ['login.css', 'text/css; charset=utf-8'],
   '/app.js': ['app.js', 'text/javascript; charset=utf-8'],
   '/styles.css': ['styles.css', 'text/css; charset=utf-8'],
   '/favicon.svg': ['favicon.svg', 'image/svg+xml'],
@@ -28,6 +32,12 @@ const SECURITY_HEADERS = {
 };
 
 const hashOwner = (token) => createHash('sha256').update(token).digest('hex');
+
+function sameSecret(left, right) {
+  const a = Buffer.from(String(left ?? ''));
+  const b = Buffer.from(String(right ?? ''));
+  return a.length === b.length && timingSafeEqual(a, b);
+}
 
 function readCookie(request, name) {
   for (const part of (request.headers.cookie ?? '').split(';')) {
@@ -64,6 +74,9 @@ export function createApp({ config, api, journal, log = () => {}, createBrowser 
   const runs = new Map();
   const runAccess = new Map();
   const browserStreams = new Set();
+  const authToken = randomBytes(32).toString('base64url');
+
+  const authenticated = (request) => !config.accessPassword || sameSecret(readCookie(request, AUTH_COOKIE), authToken);
 
   function send(response, status, body, headers = {}) {
     response.writeHead(status, {
@@ -246,6 +259,23 @@ export function createApp({ config, api, journal, log = () => {}, createBrowser 
     const method = request.method;
     let ownerToken = readCookie(request, OWNER_COOKIE);
 
+    if (segments.join('/') === 'auth/status' && method === 'GET') {
+      return send(response, 200, { authenticated: authenticated(request), required: Boolean(config.accessPassword) });
+    }
+    if (segments.join('/') === 'auth/login' && method === 'POST') {
+      const body = await readJson(request);
+      if (!config.accessPassword || !sameSecret(body.password, config.accessPassword)) {
+        throw new ActionError(401, 'invalid_password', 'That password is incorrect.');
+      }
+      const secure = config.publicHost ? '; Secure' : '';
+      return send(response, 200, { ok: true }, {
+        'Set-Cookie': `${AUTH_COOKIE}=${authToken}; Path=/; HttpOnly; SameSite=Strict; Max-Age=43200${secure}`,
+      });
+    }
+    if (!authenticated(request)) {
+      throw new ActionError(401, 'authentication_required', 'Enter the access password to continue.');
+    }
+
     if (method === 'GET' && segments.join('/') === 'config') {
       const headers = {};
       if (!ownerToken) {
@@ -379,6 +409,16 @@ export function createApp({ config, api, journal, log = () => {}, createBrowser 
       const url = new URL(request.url, 'http://local');
       assertSameOrigin(request, server.address().port);
       if (url.pathname.startsWith('/api/')) return handleApi(request, response, url);
+      if (request.method === 'GET' && url.pathname === '/') {
+        if (!authenticated(request)) {
+          response.writeHead(302, { ...SECURITY_HEADERS, Location: '/login' });
+          return response.end();
+        }
+      }
+      if (request.method === 'GET' && url.pathname === '/login' && authenticated(request)) {
+        response.writeHead(302, { ...SECURITY_HEADERS, Location: '/' });
+        return response.end();
+      }
       if (request.method === 'GET' && STATIC_FILES[url.pathname]) return serveStatic(response, url.pathname);
       throw new ActionError(404, 'not_found', 'Not found.');
     })().catch((error) => {
