@@ -1,6 +1,8 @@
-# Maya — Singtel AI Pass demo
+# Maya — GPT-6.1 Sol evaluation build
 
-Maya is a concept demo that helps a customer redeem Singtel AI Pass on the real CAST website. It combines OpenAI Agents API orchestration with an app-managed Chromium browser driven by Playwright. The browser streams live beside the chat, and the user can take control to sign in with their mobile number and SMS OTP.
+Maya helps a customer redeem Singtel AI Pass on the real CAST website. This branch evaluates GPT-6.1 Sol as the default model while retaining the same OpenAI Agents API orchestration, app-managed Chromium browser, Playwright tools, and customer takeover flow as the Astra build.
+
+The model change is deliberately isolated to this branch. It does not alter the browser permissions, credential boundaries, code-release gate, or the main Astra deployment.
 
 This repository contains a local prototype for a single presenter and session. The server listens on `127.0.0.1`; it is not a production or multi-user deployment. Browser automation uses custom function tools, not OpenAI-hosted `computer_use`.
 
@@ -91,7 +93,8 @@ Copy the template in [.env.example](.env.example). Never commit your local `.env
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `OPENAI_API_KEY` | none | OpenAI project API key |
-| `OPENAI_AGENT_MODEL` | `gpt-6-astra` | Model used by the agent session |
+| `OPENAI_AGENT_MODEL` | `gpt-6.1-sol` | Model used by the agent session |
+| `OPENAI_REASONING_EFFORT` | `low` | Reasoning effort used for agent turns |
 | `CODE_RELEASE` | locked | Set to `enabled` only for an intentional redemption |
 | `PORT` | `4310` | Local application port |
 | `START_URL` | Singtel AI Pass page | Initial navigation target |
@@ -138,8 +141,14 @@ docs/archive/           Superseded design notes
 
 ## Validation status and remaining checks
 
-The migration passed 54 automated tests and the UI checks. Independent live API validation reached the real CAST sign-in page and exercised live frames, takeover, input, and return of control through the full UI.
+The migration passed 55 automated tests and the UI checks. Independent live API validation reached the real CAST sign-in page and exercised live frames, takeover, input, and return of control through the full UI.
 
 **Real SMS sign-in and redemption have not been tested.** Before recording, rehearse the OTP flow and navigation to the empty code form with submission locked. The post-login page structure, account eligibility, code expiry, and final submission behavior still need verification with the test account. Reserve the single-use code for the intended redemption take.
 
 See [DESIGN-SPEC.md](DESIGN-SPEC.md) and [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) for further details.
+
+## Sol production evaluation
+
+Passing the automated suite establishes compatibility with Maya's request schema, tool contract, browser controller, takeover controls, and deployment artifact. It does not establish that Sol is reliable enough for customer traffic.
+
+Before promotion, run the staged evaluation in [SOL-EVALUATION.md](SOL-EVALUATION.md). The release gate is based on successful journey completion, unsafe-action rate, unnecessary takeover rate, latency, and measured cost—not on a small number of successful demonstrations.

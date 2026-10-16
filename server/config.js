@@ -50,7 +50,11 @@ export function readConfig(env = process.env) {
     castOrigin: new URL(expectedRedeemUrl).origin,
     apiKey: value('OPENAI_API_KEY'),
     baseUrl,
-    model: value('OPENAI_AGENT_MODEL') ?? 'gpt-6-astra',
+    // Sol evaluation build: keep this configurable so the same artifact can
+    // participate in A/B tests without changing application code.
+    model: value('OPENAI_AGENT_MODEL') ?? 'gpt-6.1-sol',
+    // GPT-6.1 Sol requires at least low reasoning when it uses tools.
+    reasoningEffort: value('OPENAI_REASONING_EFFORT') ?? 'low',
     host: value('HOST') ?? '127.0.0.1',
     publicHost: value('PUBLIC_HOST'),
     accessPassword: value('MAYA_ACCESS_PASSWORD'),

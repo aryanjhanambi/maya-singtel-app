@@ -101,6 +101,10 @@ test('config defaults to the hosted demo and can be switched to the live CAST fl
   assert.equal(config.fixtureMode, false);
   assert.equal(config.testMode, false);
   assert.equal(config.browserHeadless, true);
+  assert.equal(config.model, 'gpt-6.1-sol');
+  assert.equal(config.reasoningEffort, 'low');
+  assert.equal(readConfig({ OPENAI_AGENT_MODEL: 'gpt-6-astra', OPENAI_REASONING_EFFORT: 'high' }).model, 'gpt-6-astra');
+  assert.equal(readConfig({ OPENAI_AGENT_MODEL: 'gpt-6-astra', OPENAI_REASONING_EFFORT: 'high' }).reasoningEffort, 'high');
   assert.equal(readConfig({ BROWSER_HEADLESS: 'false' }).browserHeadless, false);
   assert.equal(readConfig({ OPENAI_BASE_URL: 'http://127.0.0.1:9/v1' }).fixtureMode, true);
   assert.equal(readConfig({ MAYA_TEST_MODE: '1' }).fixtureMode, true, 'test mode is always labelled');
@@ -113,6 +117,8 @@ test('session request has no environment, carries initial input, and offers only
   const body = buildSessionRequest(readConfig({}), 'Can you help me?');
   assert.deepEqual(body.environment, { type: 'none' });
   assert.deepEqual(body.input, [{ role: 'user', content: [{ type: 'input_text', text: 'Can you help me?' }] }]);
+  assert.equal(body.agent.model, 'gpt-6.1-sol');
+  assert.deepEqual(body.agent.reasoning, { effort: 'low' });
   assert.deepEqual(
     body.agent.tools.map((tool) => [tool.type, tool.name]),
     [

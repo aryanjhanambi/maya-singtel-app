@@ -66,6 +66,7 @@ export function buildSessionRequest(config, firstMessage) {
   return {
     agent: {
       model: config.model,
+      reasoning: { effort: config.reasoningEffort },
       instructions: instructions(config),
       tools: toolDefinitions,
     },
