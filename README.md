@@ -4,7 +4,7 @@ Maya helps a customer redeem Singtel AI Pass on the real CAST website. This bran
 
 The model change is deliberately isolated to this branch. It does not alter the browser permissions, credential boundaries, code-release gate, or the main Astra deployment.
 
-This repository contains a local prototype for a single presenter and session. The server listens on `127.0.0.1`; it is not a production or multi-user deployment. Browser automation uses custom function tools, not OpenAI-hosted `computer_use`.
+This repository supports a controlled pilot with up to six concurrent, isolated browser sessions by default. Local development listens on `127.0.0.1`; a public deployment requires the explicit production settings below. Browser automation uses custom function tools, not OpenAI-hosted `computer_use`.
 
 ## Quick start
 
@@ -95,6 +95,8 @@ Copy the template in [.env.example](.env.example). Never commit your local `.env
 | `OPENAI_API_KEY` | none | OpenAI project API key |
 | `OPENAI_AGENT_MODEL` | `gpt-6.1-sol` | Model used by the agent session |
 | `OPENAI_REASONING_EFFORT` | `low` | Reasoning effort used for agent turns |
+| `PUBLIC_HOST` | none | Exact public host; enables secure cookies and production configuration checks |
+| `MAYA_ACCESS_PASSWORD` | none | Access secret; public deployments require at least 16 characters |
 | `CODE_RELEASE` | locked | Set to `enabled` only for an intentional redemption |
 | `PORT` | `4310` | Local application port |
 | `START_URL` | Singtel AI Pass page | Initial navigation target |
@@ -102,6 +104,10 @@ Copy the template in [.env.example](.env.example). Never commit your local `.env
 | `ALLOWED_HOSTS` | none | Additional hosts allowed for agent browser tools |
 | `BROWSER_HEADLESS` | `true` | Set to `false` to also show the Chromium window |
 | `BROWSER_CHANNEL` | `chromium` | Set to `chrome` to use installed Google Chrome |
+
+Public deployments issue an independent, expiring authentication cookie for every successful login and throttle repeated password attempts, chat messages, session creation, browser input, and other mutations. Browser requests to literal loopback, private, link-local, and cloud-metadata addresses are blocked. The container runs as the Playwright image's unprivileged `pwuser` account.
+
+Keep the service at one replica. Browser ownership and active run state are process-local; horizontal scaling requires shared session coordination or session-aware routing first. Terminate TLS at the hosting platform, rotate the previously used development password, and keep `CODE_RELEASE` unset until the controlled redemption pilot is approved.
 
 ## Development and testing
 
@@ -141,11 +147,13 @@ docs/archive/           Superseded design notes
 
 ## Validation status and remaining checks
 
-The migration passed 55 automated tests and the UI checks. Independent live API validation reached the real CAST sign-in page and exercised live frames, takeover, input, and return of control through the full UI.
+The migration and security hardening passed 58 automated tests and the UI checks. Independent live API validation reached the real CAST sign-in page and exercised live frames, takeover, input, and return of control through the full UI.
 
 **Real SMS sign-in and redemption have not been tested.** Before recording, rehearse the OTP flow and navigation to the empty code form with submission locked. The post-login page structure, account eligibility, code expiry, and final submission behavior still need verification with the test account. Reserve the single-use code for the intended redemption take.
 
 See [DESIGN-SPEC.md](DESIGN-SPEC.md) and [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) for further details.
+
+For the public-pilot threat model, deployment gates, residual risks, and incident-response steps, see [SECURITY.md](SECURITY.md).
 
 ## Sol production evaluation
 

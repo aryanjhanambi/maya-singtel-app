@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { AgentsApiError } from '../server/agents-api.js';
-import { normalizeOrigin, readConfig } from '../server/config.js';
+import { isPrivateNetworkHost, normalizeOrigin, readConfig } from '../server/config.js';
 import { buildSessionRequest } from '../server/instructions.js';
 import { matchReply } from '../server/replies.js';
 import { CodeVault } from '../server/secrets.js';
@@ -101,6 +101,9 @@ test('config defaults to the hosted demo and can be switched to the live CAST fl
   assert.equal(config.fixtureMode, false);
   assert.equal(config.testMode, false);
   assert.equal(config.browserHeadless, true);
+  assert.equal(config.maxSessions, 6);
+  assert.equal(config.authMaxFailures, 5);
+  assert.equal(config.maxMessagesPerMinute, 30);
   assert.equal(config.model, 'gpt-6.1-sol');
   assert.equal(config.reasoningEffort, 'low');
   assert.equal(readConfig({ OPENAI_AGENT_MODEL: 'gpt-6-astra', OPENAI_REASONING_EFFORT: 'high' }).model, 'gpt-6-astra');
@@ -111,6 +114,27 @@ test('config defaults to the hosted demo and can be switched to the live CAST fl
   assert.equal(readConfig({ MAYA_DEMO_MODE: 'false' }).demoMode, false);
   assert.equal(readConfig({ MAYA_DEMO_MODE: 'false' }).castOrigin, 'https://cast.singtel.com');
   assert.equal(normalizeOrigin('https://cast.singtel.com/order/login'), 'https://cast.singtel.com');
+});
+
+test('public deployment configuration requires a strong access secret', () => {
+  assert.throws(() => readConfig({ PUBLIC_HOST: 'maya.example.com' }), /MAYA_ACCESS_PASSWORD/);
+  assert.throws(
+    () => readConfig({ PUBLIC_HOST: 'maya.example.com', MAYA_ACCESS_PASSWORD: 'too-short' }),
+    /at least 16/,
+  );
+  assert.equal(
+    readConfig({ PUBLIC_HOST: 'maya.example.com', MAYA_ACCESS_PASSWORD: 'a-unique-strong-password' }).publicHost,
+    'maya.example.com',
+  );
+});
+
+test('private, loopback, link-local, and metadata hosts are recognized', () => {
+  for (const host of ['localhost', 'app.localhost', '127.0.0.1', '10.2.3.4', '172.16.0.1', '192.168.1.1', '169.254.169.254', '::1', 'fd00::1', 'metadata.google.internal']) {
+    assert.equal(isPrivateNetworkHost(host), true, host);
+  }
+  for (const host of ['www.singtel.com', 'cast.singtel.com', '8.8.8.8', '2001:4860:4860::8888']) {
+    assert.equal(isPrivateNetworkHost(host), false, host);
+  }
 });
 
 test('session request has no environment, carries initial input, and offers only bounded function tools', () => {

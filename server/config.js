@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import { isIP } from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -33,6 +34,12 @@ export function normalizeOrigin(value) {
 
 export function readConfig(env = process.env) {
   const value = (name) => env[name]?.trim() || null;
+  const boundedNumber = (name, fallback, minimum, maximum) => {
+    const raw = value(name);
+    if (raw === null) return fallback;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? Math.min(maximum, Math.max(minimum, parsed)) : fallback;
+  };
   const baseUrl = (value('OPENAI_BASE_URL') ?? OPENAI_BASE_URL).replace(/\/+$/, '');
   // Test mode uses the local fixture's guarded code-submission path.
   const testMode = value('MAYA_TEST_MODE') === '1';
@@ -45,6 +52,11 @@ export function readConfig(env = process.env) {
   const startUrl =
     value('START_URL') ??
     (demoMode ? SINGTEL_AI_PASS_URL : SINGTEL_AI_PASS_URL);
+  const publicHost = value('PUBLIC_HOST');
+  const accessPassword = value('MAYA_ACCESS_PASSWORD');
+  if (publicHost && (!accessPassword || accessPassword.length < 16)) {
+    throw new Error('A public deployment requires MAYA_ACCESS_PASSWORD with at least 16 characters.');
+  }
   return {
     // The only origin on which the app will release the test code.
     castOrigin: new URL(expectedRedeemUrl).origin,
@@ -56,8 +68,8 @@ export function readConfig(env = process.env) {
     // GPT-6.1 Sol requires at least low reasoning when it uses tools.
     reasoningEffort: value('OPENAI_REASONING_EFFORT') ?? 'low',
     host: value('HOST') ?? '127.0.0.1',
-    publicHost: value('PUBLIC_HOST'),
-    accessPassword: value('MAYA_ACCESS_PASSWORD'),
+    publicHost,
+    accessPassword,
     port: Number(value('PORT')) || 4310,
     demoMode,
     startUrl,
@@ -87,10 +99,41 @@ export function readConfig(env = process.env) {
     reconnectBaseMs: Number(value('MAYA_RECONNECT_BASE_MS')) || 1000,
     // Bound concurrent Playwright browsers for a small hosted demo. Each run
     // remains isolated by its owner cookie and run id.
-    maxSessions: Math.max(1, Number(value('MAYA_MAX_SESSIONS')) || 6),
-    sessionIdleMs: Math.max(60_000, Number(value('MAYA_SESSION_IDLE_MS')) || 30 * 60 * 1000),
+    maxSessions: boundedNumber('MAYA_MAX_SESSIONS', 6, 1, 20),
+    sessionIdleMs: boundedNumber('MAYA_SESSION_IDLE_MS', 30 * 60 * 1000, 60_000, 4 * 60 * 60 * 1000),
+    sessionMaxAgeMs: boundedNumber('MAYA_SESSION_MAX_AGE_MS', 2 * 60 * 60 * 1000, 5 * 60_000, 12 * 60 * 60 * 1000),
+    authSessionTtlMs: boundedNumber('MAYA_AUTH_SESSION_TTL_MS', 12 * 60 * 60 * 1000, 5 * 60_000, 24 * 60 * 60 * 1000),
+    authMaxFailures: boundedNumber('MAYA_AUTH_MAX_FAILURES', 5, 2, 20),
+    authFailureWindowMs: boundedNumber('MAYA_AUTH_FAILURE_WINDOW_MS', 15 * 60 * 1000, 60_000, 60 * 60 * 1000),
+    authLockoutMs: boundedNumber('MAYA_AUTH_LOCKOUT_MS', 15 * 60 * 1000, 60_000, 24 * 60 * 60 * 1000),
+    maxMessagesPerMinute: boundedNumber('MAYA_MAX_MESSAGES_PER_MINUTE', 30, 5, 120),
+    maxInputRequestsPerMinute: boundedNumber('MAYA_MAX_INPUT_REQUESTS_PER_MINUTE', 1800, 120, 6000),
     logLevel: value('LOG_LEVEL') ?? 'info',
   };
+}
+
+/** Blocks literal loopback/private/link-local addresses and metadata hostnames. */
+export function isPrivateNetworkHost(hostname) {
+  const host = String(hostname ?? '').toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
+  if (!host) return true;
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) return true;
+  if (['metadata.google.internal', 'instance-data', '169.254.169.254'].includes(host)) return true;
+  const version = isIP(host);
+  if (version === 4) {
+    const [a, b] = host.split('.').map(Number);
+    return (
+      a === 0 || a === 10 || a === 127 || a >= 224 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 198 && (b === 18 || b === 19))
+    );
+  }
+  if (version === 6) {
+    return host === '::' || host === '::1' || /^f[cd]/.test(host) || /^fe[89ab]/.test(host) || /^ff/.test(host);
+  }
+  return false;
 }
 
 /**
@@ -105,5 +148,5 @@ export function agentMayUse(address, config) {
     return false;
   }
   const secure = url.protocol === 'https:' || (config.testMode && url.protocol === 'http:');
-  return secure && config.allowedHosts.includes(url.host);
+  return secure && (config.testMode || !isPrivateNetworkHost(url.hostname)) && config.allowedHosts.includes(url.host);
 }

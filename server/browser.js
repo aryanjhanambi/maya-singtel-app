@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { chromium } from 'playwright-core';
-import { agentMayUse } from './config.js';
+import { agentMayUse, isPrivateNetworkHost } from './config.js';
 
 /**
  * The Chromium browser this app runs for one demo session.
@@ -139,6 +139,19 @@ export class BrowserSession extends EventEmitter {
     });
     // A private context: nothing persists after it closes.
     this.#context = await this.#browser.newContext({ viewport: VIEWPORT, acceptDownloads: false });
+    if (!this.#config.testMode) {
+      await this.#context.route('**/*', async (route) => {
+        try {
+          const url = new URL(route.request().url());
+          if (['http:', 'https:'].includes(url.protocol) && isPrivateNetworkHost(url.hostname)) {
+            return route.abort('blockedbyclient');
+          }
+        } catch {
+          return route.abort('blockedbyclient');
+        }
+        return route.continue();
+      });
+    }
     this.#context.on('page', (page) => void this.#adopt(page));
     await this.#context.newPage();
     await this.#waitFor(() => this.#active !== null);
@@ -442,6 +455,17 @@ export class BrowserSession extends EventEmitter {
     }
   }
 
+  async #assertAllowedDestination() {
+    if (this.#mayUse()) return;
+    const destination = this.#originOf(this.address()) || 'an unapproved address';
+    this.#refs.clear();
+    await this.#active.goto('about:blank').catch(() => {});
+    throw new BrowserError(
+      'redirect_not_allowed',
+      `The website redirected to ${destination}, which is outside the approved websites. The page was closed.`,
+    );
+  }
+
   #originOf(address) {
     try {
       return new URL(address).origin;
@@ -515,6 +539,7 @@ export class BrowserSession extends EventEmitter {
         throw new BrowserError('navigation_failed', `The page did not load (${String(error.message).split('\n')[0].slice(0, 120)}).`);
       });
       await this.#settle(page);
+      await this.#assertAllowedDestination();
       return { ...this.#summary(), title: await this.#active.title().catch(() => '') };
     });
   }
@@ -541,6 +566,7 @@ export class BrowserSession extends EventEmitter {
       await this.#settle(page);
       // A click may have opened a tab; report the state once it is active.
       await this.#activation;
+      await this.#assertAllowedDestination();
       return { clicked: info.name, ...this.#summary(), title: await this.#active.title().catch(() => '') };
     });
   }

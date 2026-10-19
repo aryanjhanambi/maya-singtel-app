@@ -74,9 +74,70 @@ export function createApp({ config, api, journal, log = () => {}, createBrowser 
   const runs = new Map();
   const runAccess = new Map();
   const browserStreams = new Set();
-  const authToken = randomBytes(32).toString('base64url');
+  const authSessions = new Map();
+  const authFailures = new Map();
+  const rateWindows = new Map();
 
-  const authenticated = (request) => !config.accessPassword || sameSecret(readCookie(request, AUTH_COOKIE), authToken);
+  function authentication(request) {
+    if (!config.accessPassword) return { id: 'password-not-required', expiresAt: Infinity };
+    const token = readCookie(request, AUTH_COOKIE);
+    const id = token ? hashOwner(token) : null;
+    const session = id ? authSessions.get(id) : null;
+    if (!session || session.expiresAt <= Date.now()) {
+      if (id) authSessions.delete(id);
+      return null;
+    }
+    return { id, ...session };
+  }
+
+  const authenticated = (request) => Boolean(authentication(request));
+
+  function cookie(name, value, maxAge) {
+    const secure = config.publicHost ? '; Secure' : '';
+    return `${name}=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${secure}`;
+  }
+
+  function clientKey(request) {
+    const forwarded = config.publicHost && typeof request.headers['x-forwarded-for'] === 'string'
+      ? request.headers['x-forwarded-for'].split(',')[0].trim()
+      : '';
+    return hashOwner(forwarded || request.socket.remoteAddress || 'unknown');
+  }
+
+  function recentFailures(key, now = Date.now()) {
+    const record = authFailures.get(key) ?? { attempts: [], lockedUntil: 0 };
+    record.attempts = record.attempts.filter((at) => now - at < config.authFailureWindowMs);
+    if (record.lockedUntil <= now) record.lockedUntil = 0;
+    authFailures.set(key, record);
+    return record;
+  }
+
+  function assertLoginAllowed(request) {
+    const now = Date.now();
+    for (const key of [clientKey(request), 'global']) {
+      const record = recentFailures(key, now);
+      if (record.lockedUntil > now) {
+        throw new ActionError(429, 'login_rate_limited', 'Too many sign-in attempts. Try again later.');
+      }
+    }
+  }
+
+  function recordLoginFailure(request) {
+    const now = Date.now();
+    for (const [key, maximum] of [[clientKey(request), config.authMaxFailures], ['global', config.authMaxFailures * 10]]) {
+      const record = recentFailures(key, now);
+      record.attempts.push(now);
+      if (record.attempts.length >= maximum) record.lockedUntil = now + config.authLockoutMs;
+    }
+  }
+
+  function assertRate(key, maximum, windowMs = 60_000) {
+    const now = Date.now();
+    const recent = (rateWindows.get(key) ?? []).filter((at) => now - at < windowMs);
+    if (recent.length >= maximum) throw new ActionError(429, 'rate_limited', 'Too many requests. Wait a moment and try again.');
+    recent.push(now);
+    rateWindows.set(key, recent);
+  }
 
   function send(response, status, body, headers = {}) {
     response.writeHead(status, {
@@ -91,12 +152,20 @@ export function createApp({ config, api, journal, log = () => {}, createBrowser 
 
   const cleanupTimer = setInterval(() => {
     const now = Date.now();
+    for (const [id, session] of authSessions) if (session.expiresAt <= now) authSessions.delete(id);
+    for (const [key, values] of rateWindows) {
+      const recent = values.filter((at) => now - at < 10 * 60_000);
+      if (recent.length) rateWindows.set(key, recent);
+      else rateWindows.delete(key);
+    }
     for (const run of activeRuns()) {
       const lastAccess = runAccess.get(run.id) ?? run.createdAt;
       const status = run.snapshot().status;
       // Never discard an unresolved redemption outcome automatically; it must
       // remain available for explicit presenter review.
-      if (now - lastAccess < config.sessionIdleMs || status.turnActive || status.state === 'outcome_unknown') continue;
+      const idle = now - lastAccess >= config.sessionIdleMs && !status.turnActive;
+      const expired = now - run.createdAt >= config.sessionMaxAgeMs;
+      if ((!idle && !expired) || status.state === 'outcome_unknown') continue;
       run.end({ force: true }).catch((error) => log('warn', `idle session cleanup failed: ${error?.name ?? 'Error'}`));
     }
   }, Math.min(config.sessionIdleMs, 60_000));
@@ -263,24 +332,33 @@ export function createApp({ config, api, journal, log = () => {}, createBrowser 
       return send(response, 200, { authenticated: authenticated(request), required: Boolean(config.accessPassword) });
     }
     if (segments.join('/') === 'auth/login' && method === 'POST') {
+      assertLoginAllowed(request);
       const body = await readJson(request);
       if (!config.accessPassword || !sameSecret(body.password, config.accessPassword)) {
+        recordLoginFailure(request);
         throw new ActionError(401, 'invalid_password', 'That password is incorrect.');
       }
-      const secure = config.publicHost ? '; Secure' : '';
+      authFailures.delete(clientKey(request));
+      const token = randomBytes(32).toString('base64url');
+      authSessions.set(hashOwner(token), { expiresAt: Date.now() + config.authSessionTtlMs });
       return send(response, 200, { ok: true }, {
-        'Set-Cookie': `${AUTH_COOKIE}=${authToken}; Path=/; HttpOnly; SameSite=Strict; Max-Age=43200${secure}`,
+        'Set-Cookie': cookie(AUTH_COOKIE, token, Math.floor(config.authSessionTtlMs / 1000)),
       });
     }
-    if (!authenticated(request)) {
+    const auth = authentication(request);
+    if (!auth) {
       throw new ActionError(401, 'authentication_required', 'Enter the access password to continue.');
+    }
+    if (segments.join('/') === 'auth/logout' && method === 'POST') {
+      authSessions.delete(auth.id);
+      return send(response, 200, { ok: true }, { 'Set-Cookie': cookie(AUTH_COOKIE, '', 0) });
     }
 
     if (method === 'GET' && segments.join('/') === 'config') {
       const headers = {};
       if (!ownerToken) {
         ownerToken = randomBytes(32).toString('base64url');
-        headers['Set-Cookie'] = `${OWNER_COOKIE}=${ownerToken}; Path=/; HttpOnly; SameSite=Strict`;
+        headers['Set-Cookie'] = cookie(OWNER_COOKIE, ownerToken, Math.floor(config.authSessionTtlMs / 1000));
       }
       return send(
         response,
@@ -300,6 +378,15 @@ export function createApp({ config, api, journal, log = () => {}, createBrowser 
 
     if (!ownerToken) throw new ActionError(401, 'no_owner', 'Reload the page to start.');
     const ownerHash = hashOwner(ownerToken);
+    const rateOwner = auth.id === 'password-not-required' ? ownerHash : auth.id;
+
+    if (!['GET', 'HEAD'].includes(method)) {
+      const route = segments.slice(2).join('/');
+      if (segments.length === 1 && method === 'POST') assertRate(`${rateOwner}:runs`, 5, 10 * 60_000);
+      else if (route === 'messages') assertRate(`${rateOwner}:messages`, config.maxMessagesPerMinute);
+      else if (route === 'browser/input') assertRate(`${rateOwner}:browser-input`, config.maxInputRequestsPerMinute);
+      else assertRate(`${rateOwner}:mutations`, 240);
+    }
 
     if (segments[0] === 'previous' && segments.length === 2 && method === 'POST') {
       const body = await readJson(request);

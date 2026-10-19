@@ -112,6 +112,26 @@ test('the password gate protects Maya and sets a server-only authentication cook
   assert.equal((await call('GET', '/api/config')).status, 200);
 });
 
+test('login sessions are independent, revocable, and repeated failures are throttled', async (t) => {
+  const { client } = await startApp(t, { accessPassword: 'correct-horse-battery-staple' });
+  const first = client();
+  const second = client();
+  const firstLogin = await first('POST', '/api/auth/login', { password: 'correct-horse-battery-staple' });
+  const secondLogin = await second('POST', '/api/auth/login', { password: 'correct-horse-battery-staple' });
+  assert.notEqual(firstLogin.headers['set-cookie'][0], secondLogin.headers['set-cookie'][0]);
+  assert.equal((await first('POST', '/api/auth/logout', {})).status, 200);
+  assert.equal((await first('GET', '/api/config')).status, 401);
+  assert.equal((await second('GET', '/api/config')).status, 200);
+
+  const attacker = client();
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    assert.equal((await attacker('POST', '/api/auth/login', { password: 'wrong' })).status, 401);
+  }
+  const limited = await attacker('POST', '/api/auth/login', { password: 'wrong' });
+  assert.equal(limited.status, 429);
+  assert.equal(limited.body.error.code, 'login_rate_limited');
+});
+
 test('without an API key the app reports setup, starts no browser, and contacts nothing', async (t) => {
   const { client, fixture, app } = await startApp(t, { configured: false });
   const call = client();
