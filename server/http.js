@@ -5,6 +5,7 @@ import path from 'node:path';
 import { AgentsApiError } from './agents-api.js';
 import { ROOT } from './config.js';
 import { ActionError, ENGINE, Run } from './run.js';
+import { verifyTurnstile } from './turnstile.js';
 
 const OWNER_COOKIE = 'maya_owner';
 const AUTH_COOKIE = 'maya_auth';
@@ -25,7 +26,7 @@ const STATIC_FILES = {
 const SECURITY_HEADERS = {
   'Cache-Control': 'no-store',
   'Content-Security-Policy':
-    "default-src 'self'; img-src 'self' blob:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+    "default-src 'self'; img-src 'self' blob:; style-src 'self'; script-src 'self' https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
   'Referrer-Policy': 'no-referrer',
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
@@ -70,7 +71,7 @@ async function readJson(request) {
  * live browser stream with its control and input routes. `api` is null when
  * no API key is configured; the app then only reports that setup is needed.
  */
-export function createApp({ config, api, journal, log = () => {}, createBrowser }) {
+export function createApp({ config, api, journal, log = () => {}, createBrowser, verifyChallenge = verifyTurnstile }) {
   const runs = new Map();
   const runAccess = new Map();
   const browserStreams = new Set();
@@ -97,12 +98,14 @@ export function createApp({ config, api, journal, log = () => {}, createBrowser 
     return `${name}=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${secure}`;
   }
 
-  function clientKey(request) {
+  function clientAddress(request) {
     const forwarded = config.publicHost && typeof request.headers['x-forwarded-for'] === 'string'
       ? request.headers['x-forwarded-for'].split(',')[0].trim()
       : '';
-    return hashOwner(forwarded || request.socket.remoteAddress || 'unknown');
+    return forwarded || request.socket.remoteAddress || 'unknown';
   }
+
+  const clientKey = (request) => hashOwner(clientAddress(request));
 
   function recentFailures(key, now = Date.now()) {
     const record = authFailures.get(key) ?? { attempts: [], lockedUntil: 0 };
@@ -329,11 +332,27 @@ export function createApp({ config, api, journal, log = () => {}, createBrowser 
     let ownerToken = readCookie(request, OWNER_COOKIE);
 
     if (segments.join('/') === 'auth/status' && method === 'GET') {
-      return send(response, 200, { authenticated: authenticated(request), required: Boolean(config.accessPassword) });
+      return send(response, 200, {
+        authenticated: authenticated(request),
+        required: Boolean(config.accessPassword),
+        turnstileSiteKey: config.turnstileSiteKey ?? null,
+      });
     }
     if (segments.join('/') === 'auth/login' && method === 'POST') {
       assertLoginAllowed(request);
       const body = await readJson(request);
+      if (config.turnstileSecretKey) {
+        const human = await verifyChallenge({
+          secret: config.turnstileSecretKey,
+          token: body.turnstileToken,
+          remoteIp: clientAddress(request),
+          expectedHostname: config.publicHost,
+        });
+        if (!human) {
+          recordLoginFailure(request);
+          throw new ActionError(403, 'human_verification_failed', 'Please complete the verification and try again.');
+        }
+      }
       if (!config.accessPassword || !sameSecret(body.password, config.accessPassword)) {
         recordLoginFailure(request);
         throw new ActionError(401, 'invalid_password', 'That password is incorrect.');

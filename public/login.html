@@ -20,8 +20,9 @@
             <input id="password" name="password" type="password" autocomplete="current-password" required autofocus />
             <button id="toggle-password" class="toggle" type="button" aria-label="Show password">Show</button>
           </div>
+          <div id="turnstile" class="turnstile" hidden aria-label="Human verification"></div>
           <p id="error" class="error" role="alert" hidden></p>
-          <button id="submit" class="submit" type="submit">Continue</button>
+          <button id="submit" class="submit" type="submit" disabled>Continue</button>
         </form>
         <p class="privacy">Your password is checked securely by the Maya server.</p>
       </section>

@@ -54,8 +54,13 @@ export function readConfig(env = process.env) {
     (demoMode ? SINGTEL_AI_PASS_URL : SINGTEL_AI_PASS_URL);
   const publicHost = value('PUBLIC_HOST');
   const accessPassword = value('MAYA_ACCESS_PASSWORD');
+  const turnstileSiteKey = value('CLOUDFLARE_TURNSTILE_SITE_KEY');
+  const turnstileSecretKey = value('CLOUDFLARE_TURNSTILE_SECRET_KEY');
   if (publicHost && (!accessPassword || accessPassword.length < 16)) {
     throw new Error('A public deployment requires MAYA_ACCESS_PASSWORD with at least 16 characters.');
+  }
+  if (Boolean(turnstileSiteKey) !== Boolean(turnstileSecretKey)) {
+    throw new Error('Cloudflare Turnstile requires both CLOUDFLARE_TURNSTILE_SITE_KEY and CLOUDFLARE_TURNSTILE_SECRET_KEY.');
   }
   return {
     // The only origin on which the app will release the test code.
@@ -70,6 +75,8 @@ export function readConfig(env = process.env) {
     host: value('HOST') ?? '127.0.0.1',
     publicHost,
     accessPassword,
+    turnstileSiteKey,
+    turnstileSecretKey,
     port: Number(value('PORT')) || 4310,
     demoMode,
     startUrl,

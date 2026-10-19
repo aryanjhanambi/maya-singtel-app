@@ -5,6 +5,7 @@ import { isPrivateNetworkHost, normalizeOrigin, readConfig } from '../server/con
 import { buildSessionRequest } from '../server/instructions.js';
 import { matchReply } from '../server/replies.js';
 import { CodeVault } from '../server/secrets.js';
+import { verifyTurnstile } from '../server/turnstile.js';
 import { createSseParser } from '../server/sse.js';
 import { summarizeApiEvent } from '../server/summarize.js';
 
@@ -126,6 +127,10 @@ test('public deployment configuration requires a strong access secret', () => {
     readConfig({ PUBLIC_HOST: 'maya.example.com', MAYA_ACCESS_PASSWORD: 'a-unique-strong-password' }).publicHost,
     'maya.example.com',
   );
+  assert.throws(
+    () => readConfig({ CLOUDFLARE_TURNSTILE_SITE_KEY: 'site-only' }),
+    /requires both/,
+  );
 });
 
 test('private, loopback, link-local, and metadata hosts are recognized', () => {
@@ -135,6 +140,25 @@ test('private, loopback, link-local, and metadata hosts are recognized', () => {
   for (const host of ['www.singtel.com', 'cast.singtel.com', '8.8.8.8', '2001:4860:4860::8888']) {
     assert.equal(isPrivateNetworkHost(host), false, host);
   }
+});
+
+test('Turnstile validation requires Cloudflare success, the login action, and the configured hostname', async () => {
+  const result = (overrides = {}) => verifyTurnstile({
+    secret: 'secret',
+    token: 'token',
+    remoteIp: '203.0.113.10',
+    expectedHostname: 'maya.example.com',
+    fetchImpl: async (_url, request) => {
+      assert.equal(request.body.get('secret'), 'secret');
+      assert.equal(request.body.get('response'), 'token');
+      assert.equal(request.body.get('remoteip'), '203.0.113.10');
+      return { ok: true, json: async () => ({ success: true, action: 'maya-login', hostname: 'maya.example.com', ...overrides }) };
+    },
+  });
+  assert.equal(await result(), true);
+  assert.equal(await result({ action: 'another-form' }), false);
+  assert.equal(await result({ hostname: 'attacker.example' }), false);
+  assert.equal(await result({ success: false }), false);
 });
 
 test('session request has no environment, carries initial input, and offers only bounded function tools', () => {

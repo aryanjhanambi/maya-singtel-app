@@ -8,16 +8,22 @@ import { createApp } from '../server/http.js';
 import { MemoryJournal } from '../server/store.js';
 import { FIXTURE_CODE, TOOL_RESULT, startWorld, waitFor } from './helpers.js';
 
-async function startApp(t, { configured = true, armed = false, accessPassword = null } = {}) {
+async function startApp(t, { configured = true, armed = false, accessPassword = null, turnstile = false, verifyChallenge } = {}) {
   const world = await startWorld(t, { armed });
   const { fixture, config } = world;
   const logs = [];
   const journal = new MemoryJournal();
   const app = createApp({
-    config: configured ? { ...config, accessPassword } : readConfig({ MAYA_DATA_DIR: '/nonexistent-unused' }),
+    config: configured ? {
+      ...config,
+      accessPassword,
+      turnstileSiteKey: turnstile ? 'test-site-key' : null,
+      turnstileSecretKey: turnstile ? 'test-secret-key' : null,
+    } : readConfig({ MAYA_DATA_DIR: '/nonexistent-unused' }),
     api: configured ? createAgentsApi({ apiKey: config.apiKey, baseUrl: config.baseUrl }) : null,
     journal,
     log: (level, message) => logs.push(`${level} ${message}`),
+    ...(verifyChallenge ? { verifyChallenge } : {}),
   });
   await new Promise((resolve) => app.server.listen(0, '127.0.0.1', resolve));
   const port = app.server.address().port;
@@ -130,6 +136,32 @@ test('login sessions are independent, revocable, and repeated failures are throt
   const limited = await attacker('POST', '/api/auth/login', { password: 'wrong' });
   assert.equal(limited.status, 429);
   assert.equal(limited.body.error.code, 'login_rate_limited');
+});
+
+test('Turnstile is enforced by the server before a public login succeeds', async (t) => {
+  const challenges = [];
+  const { client } = await startApp(t, {
+    accessPassword: 'correct-horse-battery-staple',
+    turnstile: true,
+    verifyChallenge: async (challenge) => {
+      challenges.push(challenge);
+      return challenge.token === 'valid-human-token';
+    },
+  });
+  const call = client();
+  const status = await call('GET', '/api/auth/status');
+  assert.equal(status.body.turnstileSiteKey, 'test-site-key');
+
+  const missing = await call('POST', '/api/auth/login', { password: 'correct-horse-battery-staple' });
+  assert.equal(missing.status, 403);
+  assert.equal(missing.body.error.code, 'human_verification_failed');
+
+  const login = await call('POST', '/api/auth/login', {
+    password: 'correct-horse-battery-staple',
+    turnstileToken: 'valid-human-token',
+  });
+  assert.equal(login.status, 200);
+  assert.equal(challenges.at(-1).secret, 'test-secret-key');
 });
 
 test('without an API key the app reports setup, starts no browser, and contacts nothing', async (t) => {

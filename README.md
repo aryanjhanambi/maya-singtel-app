@@ -97,6 +97,8 @@ Copy the template in [.env.example](.env.example). Never commit your local `.env
 | `OPENAI_REASONING_EFFORT` | `low` | Reasoning effort used for agent turns |
 | `PUBLIC_HOST` | none | Exact public host; enables secure cookies and production configuration checks |
 | `MAYA_ACCESS_PASSWORD` | none | Access secret; public deployments require at least 16 characters |
+| `CLOUDFLARE_TURNSTILE_SITE_KEY` | none | Public Turnstile widget key shown on the login page |
+| `CLOUDFLARE_TURNSTILE_SECRET_KEY` | none | Server-only key used to validate each one-time Turnstile token |
 | `CODE_RELEASE` | locked | Set to `enabled` only for an intentional redemption |
 | `PORT` | `4310` | Local application port |
 | `START_URL` | Singtel AI Pass page | Initial navigation target |
@@ -105,7 +107,7 @@ Copy the template in [.env.example](.env.example). Never commit your local `.env
 | `BROWSER_HEADLESS` | `true` | Set to `false` to also show the Chromium window |
 | `BROWSER_CHANNEL` | `chromium` | Set to `chrome` to use installed Google Chrome |
 
-Public deployments issue an independent, expiring authentication cookie for every successful login and throttle repeated password attempts, chat messages, session creation, browser input, and other mutations. Browser requests to literal loopback, private, link-local, and cloud-metadata addresses are blocked. The container runs as the Playwright image's unprivileged `pwuser` account.
+Public deployments issue an independent, expiring authentication cookie for every successful login and throttle repeated password attempts, chat messages, session creation, browser input, and other mutations. When both Turnstile keys are configured, the server requires and validates a single-use Cloudflare token before accepting the access password. Browser requests to literal loopback, private, link-local, and cloud-metadata addresses are blocked. The container runs as the Playwright image's unprivileged `pwuser` account.
 
 Keep the service at one replica. Browser ownership and active run state are process-local; horizontal scaling requires shared session coordination or session-aware routing first. Terminate TLS at the hosting platform, rotate the previously used development password, and keep `CODE_RELEASE` unset until the controlled redemption pilot is approved.
 
@@ -147,13 +149,14 @@ docs/archive/           Superseded design notes
 
 ## Validation status and remaining checks
 
-The migration and security hardening passed 58 automated tests and the UI checks. Independent live API validation reached the real CAST sign-in page and exercised live frames, takeover, input, and return of control through the full UI.
+The migration and security hardening passed 60 automated tests and the UI checks. Independent live API validation reached the real CAST sign-in page and exercised live frames, takeover, input, and return of control through the full UI.
 
 **Real SMS sign-in and redemption have not been tested.** Before recording, rehearse the OTP flow and navigation to the empty code form with submission locked. The post-login page structure, account eligibility, code expiry, and final submission behavior still need verification with the test account. Reserve the single-use code for the intended redemption take.
 
 See [DESIGN-SPEC.md](DESIGN-SPEC.md) and [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) for further details.
 
 For the public-pilot threat model, deployment gates, residual risks, and incident-response steps, see [SECURITY.md](SECURITY.md).
+For the Railway custom-domain, Turnstile, and edge rate-limit rollout, see [CLOUDFLARE-SETUP.md](CLOUDFLARE-SETUP.md).
 
 ## Sol production evaluation
 

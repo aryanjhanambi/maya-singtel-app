@@ -86,6 +86,9 @@ input:focus { outline: 3px solid rgba(215, 16, 47, 0.18); border-color: var(--re
   cursor: pointer;
 }
 
+.turnstile { margin-top: 18px; min-height: 65px; }
+.turnstile iframe { max-width: 100%; }
+
 .submit {
   width: 100%;
   min-height: 54px;

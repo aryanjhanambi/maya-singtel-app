@@ -6,6 +6,7 @@ This document describes the safeguards in the Sol evaluation build and the contr
 
 - Every successful password login receives a unique, expiring, server-side session. Logging out revokes only that session.
 - Authentication failures are throttled per client and globally. Session creation, messages, browser input, and other mutations also have bounded rates.
+- Optional Cloudflare Turnstile is validated server-side before password authentication. Tokens must be fresh, single-use, issued for the configured hostname, and tagged for Maya login.
 - Owner cookies are random, HTTP-only, `SameSite=Strict`, time limited, and marked `Secure` when `PUBLIC_HOST` is configured.
 - Each customer run has its own non-persistent Chromium context and owner identity. One customer cannot attach to another customer's run or browser stream.
 - Sessions close after an idle timeout or maximum lifetime. `outcome_unknown` runs are retained rather than silently discarding an uncertain redemption result.
@@ -19,10 +20,12 @@ This document describes the safeguards in the Sol evaluation build and the contr
 1. Serve only through the hosting platform's HTTPS endpoint.
 2. Set `PUBLIC_HOST` to the exact public hostname. The app will then reject unexpected Host headers and issue secure cookies.
 3. Set `MAYA_ACCESS_PASSWORD` to a newly generated secret of at least 16 characters. Do not reuse the password previously shared in chat, source code, screenshots, or a presentation.
-4. Keep `CODE_RELEASE` unset until the approved live-redemption window.
-5. Keep one application replica. Run state is currently in memory; horizontal scaling needs shared coordination or session-aware routing.
-6. Limit the service to the intended audience at the hosting edge when possible, and set budget and usage alerts for both the host and OpenAI project.
-7. Send application logs to a restricted central sink. Never record browser frames, OTPs, voucher codes, or customer-entered fields.
+4. Put a Cloudflare-proxied custom domain in front of Railway. Configure a Turnstile widget for that hostname and set both `CLOUDFLARE_TURNSTILE_SITE_KEY` and `CLOUDFLARE_TURNSTILE_SECRET_KEY` in Railway.
+5. Add Cloudflare rate-limiting rules for `POST /api/auth/login` and `POST /api/runs`, plus a broader limit for `/api/*`. Use a managed challenge before blocking while tuning thresholds.
+6. Keep `CODE_RELEASE` unset until the approved live-redemption window.
+7. Keep one application replica. Run state is currently in memory; horizontal scaling needs shared coordination or session-aware routing.
+8. Limit the service to the intended audience at the hosting edge when possible, and set budget and usage alerts for both the host and OpenAI project.
+9. Send application logs to a restricted central sink. Never record browser frames, OTPs, voucher codes, or customer-entered fields.
 
 Recommended pilot values:
 
