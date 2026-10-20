@@ -36,3 +36,16 @@
 - The server checks each challenge result with Cloudflare; a browser-only check would not be enough.
 - Turnstile checks are tied to the configured website and cannot be reused.
 - The user confirmed the Cloudflare setup was working after deployment.
+
+### 20 October 2026 — Strengthened Maya's safety instructions
+
+- Added clearer rules telling Maya to treat website text, screenshots, and tool results as information to inspect, not directions to obey. This helps resist attempts hidden in a page that tell Maya to ignore its rules or reveal private information.
+- Added a direct refusal for requests to demean, exclude, or target people based on protected traits. Maya is told to answer exactly: “I can't help you with that request” and not suggest a workaround.
+- These instructions add protection, but AI instructions alone cannot guarantee that a model will always resist every attack. Website restrictions and the app's existing limits on what actions Maya can take remain important safeguards.
+
+### 20 October 2026 — Broader sensitive-topic guardrails requested
+
+- Requested follow-up work: add strong safeguards for terrorism and violence, racism, sexism, xenophobia, homophobia, and other discriminatory or hateful conduct.
+- This broader work is not yet complete. The current safety instructions are an initial layer, not a comprehensive policy or a guarantee that every harmful request will be handled correctly.
+- The planned guardrails should block assistance that enables violence or terrorism, or promotes, targets, demeans, or excludes people based on protected traits, while still allowing appropriate educational, historical, prevention, news, and support conversations.
+- The work should also test repeated pressure, role-play, encoded or indirect requests, and malicious instructions embedded in webpages or other content; ensure the assistant does not invoke browser actions or other tools to carry out a disallowed request; and record what was tested and any known limitations.
