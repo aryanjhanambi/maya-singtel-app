@@ -1040,7 +1040,36 @@ async function loadCurrent() {
   resetView();
   renderIntro();
   renderStatus();
+  showOnboardingIfNeeded();
   return undefined;
+}
+
+function showOnboardingIfNeeded() {
+  if (!app.config?.configured || app.runId || app.previous) return;
+  try {
+    if (localStorage.getItem('maya-onboarding-seen-v1') === 'yes') return;
+  } catch {
+    // If browser storage is unavailable, show the explanation for this visit.
+  }
+  $('onboarding').hidden = false;
+  $('onboarding-redeem').focus();
+}
+
+function dismissOnboarding() {
+  $('onboarding').hidden = true;
+  try {
+    localStorage.setItem('maya-onboarding-seen-v1', 'yes');
+  } catch {
+    // The page remains usable when browser storage is unavailable.
+  }
+  $('message').focus();
+}
+
+function startRedemptionFromWelcome() {
+  dismissOnboarding();
+  $('message').value = 'Help me redeem my Singtel AI Pass.';
+  autosize();
+  void sendMessage();
 }
 
 // ---- Presenter actions ---------------------------------------------------------
@@ -1097,6 +1126,15 @@ async function endSession() {
 }
 
 function bind() {
+  $('onboarding-redeem').addEventListener('click', startRedemptionFromWelcome);
+  $('onboarding-continue').addEventListener('click', dismissOnboarding);
+  $('onboarding').addEventListener('keydown', (event) => {
+    if (event.key === 'Tab' && !$('onboarding').hidden) {
+      event.preventDefault();
+      if (event.shiftKey) $('onboarding-continue').focus();
+      else $('onboarding-redeem').focus();
+    }
+  });
   $('composer').addEventListener('submit', (event) => {
     event.preventDefault();
     void sendMessage();

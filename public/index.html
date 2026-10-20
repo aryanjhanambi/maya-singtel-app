@@ -12,6 +12,47 @@
       UI fixture — scripted local data. Not OpenAI. Not CAST. Nothing shown here is a real result.
     </div>
 
+    <main id="onboarding" class="onboarding" role="dialog" aria-modal="true" aria-labelledby="onboarding-title" hidden>
+      <section class="onboarding-card">
+        <img class="onboarding-avatar" src="/assets/maya-avatar.png" alt="" />
+        <p class="eyebrow">MEET MAYA</p>
+        <h1 id="onboarding-title">A little help, right when you need it.</h1>
+        <p class="onboarding-intro">Maya is your Singtel AI Pass assistant. Ask a question or tell her what you’d like help with, and she’ll guide you along the way.</p>
+        <div class="onboarding-steps" aria-label="How Maya works">
+          <article>
+            <span class="onboarding-number" aria-hidden="true">1</span>
+            <h2>Tell Maya what you need</h2>
+            <p>Ask a question or describe what you’re trying to do.</p>
+          </article>
+          <article>
+            <span class="onboarding-number" aria-hidden="true">2</span>
+            <h2>Follow the guidance</h2>
+            <p>Maya will guide you while the website opens in the secure browser.</p>
+          </article>
+          <article>
+            <span class="onboarding-number" aria-hidden="true">3</span>
+            <h2>You stay in control</h2>
+            <p>When Maya needs you, choose <strong>Take control</strong>. Maya pauses while you use the website. Choose <strong>Return to Maya</strong> when you’re ready for her to continue.</p>
+          </article>
+        </div>
+        <div class="onboarding-details">
+          <section class="onboarding-detail">
+            <h2>Your sign-in details stay out of chat</h2>
+            <p>Maya’s AI uses your messages and relevant page information to help. When you take control, Maya pauses. Passwords and one-time codes you type directly into the website are not sent to Maya’s AI or added to chat. Please never share them in chat.</p>
+          </section>
+          <section class="onboarding-detail onboarding-end-note">
+            <h2>When you’re finished</h2>
+            <p>Choose <strong>End session</strong> to close the browser and finish your Maya session. Closing the tab alone may leave it open for a while.</p>
+          </section>
+        </div>
+        <p class="onboarding-note">Review the website before confirming anything important.</p>
+        <div class="onboarding-actions">
+          <button id="onboarding-redeem" class="button button-primary onboarding-continue" type="button">Redeem Singtel AI Pass</button>
+          <button id="onboarding-continue" class="button onboarding-continue" type="button">Start chatting</button>
+        </div>
+      </section>
+    </main>
+
     <header class="topbar">
       <div class="brand">
         <span class="avatar avatar-large avatar-image" aria-hidden="true">
