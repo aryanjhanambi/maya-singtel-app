@@ -10,7 +10,7 @@ This document describes the safeguards in the Sol evaluation build and the contr
 - Owner cookies are random, HTTP-only, `SameSite=Strict`, time limited, and marked `Secure` when `PUBLIC_HOST` is configured.
 - Each customer run has its own non-persistent Chromium context and owner identity. One customer cannot attach to another customer's run or browser stream.
 - Sessions close after an idle timeout or maximum lifetime. `outcome_unknown` runs are retained rather than silently discarding an uncertain redemption result.
-- Agent navigation is HTTPS-only and host-allow-listed. Redirects are revalidated. Literal loopback, private, link-local, multicast, and cloud-metadata destinations are blocked outside tests.
+- Agent navigation is HTTPS-only and allow-listed by exact host or approved domain suffix (`singtel.com` and `gomo.sg`, including subdomains). Redirects are revalidated; suffix matches reject custom ports and lookalike domains. Literal loopback, private, link-local, multicast, and cloud-metadata destinations are blocked outside tests.
 - The model cannot read form input values or type arbitrary text. Sign-in is a human takeover, and the redemption code is held by the application rather than sent to the model.
 - Code submission is disabled unless `CODE_RELEASE=enabled`; submission requires explicit confirmation and is journaled before the one permitted attempt.
 - The container runs as the Playwright image's unprivileged `pwuser` account.
@@ -45,6 +45,7 @@ MAYA_MAX_INPUT_REQUESTS_PER_MINUTE=1800
 
 - A shared password is admission control, not customer identity. Replace it with Singtel SSO/OIDC, named accounts, roles, and audit attribution before a broad launch.
 - Application throttles are per process and reset on restart. Use an edge WAF/rate limiter and a shared store such as Redis before running multiple replicas or facing untrusted public traffic.
+- Domain-suffix access exposes more pages on those brands to Maya's browser and increases prompt-injection and sensitive-page exposure risk. The task instructions remain restricted to Singtel AI Pass, but this is not a substitute for page-level action policies.
 - Hostname allow-listing reduces SSRF risk but is not a complete egress boundary against DNS rebinding or a compromised permitted site. Enforce outbound firewall or proxy rules at the infrastructure layer.
 - A permitted web page can contain hostile instructions. The bounded tool surface and app policies limit impact, but prompt-injection and adversarial-page evaluations remain a release requirement.
 - CAST completion is inferred from the page. For money-, entitlement-, or voucher-sensitive production use, add a trusted backend confirmation or idempotency key instead of relying only on rendered text.

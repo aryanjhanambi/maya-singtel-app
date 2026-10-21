@@ -38,6 +38,14 @@ test('the address policy allows only secure pages on listed hosts', () => {
   const config = readConfig({ MAYA_DEMO_MODE: 'false' });
   assert.equal(agentMayUse('https://cast.singtel.com/order/login', config), true);
   assert.equal(agentMayUse('https://www.singtel.com/personal', config), true);
+  assert.equal(agentMayUse('https://singtel.com/', config), true);
+  assert.equal(agentMayUse('https://hiapp.singtel.com/account', config), true);
+  assert.equal(agentMayUse('https://deep.subdomain.gomo.sg/account', config), true);
+  assert.equal(agentMayUse('https://gomo.sg/', config), true);
+  assert.equal(agentMayUse('https://notgomo.sg/', config), false);
+  assert.equal(agentMayUse('https://gomo.sg.evil.example/', config), false);
+  assert.equal(agentMayUse('https://hiapp.singtel.com:8443/', config), false);
+  assert.equal(agentMayUse('https://hiapp.singtel.com./account', config), true);
   assert.equal(agentMayUse('http://cast.singtel.com/order/login', config), false);
   assert.equal(agentMayUse('https://cast.singtel.com.evil.example/', config), false);
   assert.equal(agentMayUse('https://example.com/', config), false);

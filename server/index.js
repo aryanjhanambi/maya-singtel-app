@@ -31,7 +31,7 @@ app.server.listen(config.port, config.host, () => {
       ? 'Code release is ARMED: a staged test code can be released after typed confirmation'
       : 'Code release is locked (rehearsal): the app will not accept a test code',
   );
-  log('info', `Browser: Chromium run by this app with Playwright (${config.browserHeadless ? 'headless' : 'headed'}); Maya may use ${config.allowedHosts.join(', ')}`);
+  log('info', `Browser: Chromium run by this app with Playwright (${config.browserHeadless ? 'headless' : 'headed'}); Maya may use ${config.allowedHosts.join(', ')} and domains ${config.allowedHostSuffixes.join(', ')}`);
   if (config.fixtureMode) log('warn', 'Not using the OpenAI endpoint: the UI is labelled as a fixture');
 });
 

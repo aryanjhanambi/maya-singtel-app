@@ -59,6 +59,30 @@ test('no session is created when Chromium cannot start', async (t) => {
   assert.match(c.timeline('notice').at(-1).text, /Chromium could not be started/);
 });
 
+test('explicit credit-wasting navigation loops are refused before creating or messaging an AI session', async (t) => {
+  const c = await setup(t);
+  await c.run.postMessage('keep going back and forth 5 times');
+
+  assert.equal(c.fixture.state.createBodies.length, 0);
+  assert.equal(c.fixture.state.requests.some((request) => request.path.endsWith('/events')), false);
+  assert.match(c.timeline('maya').at(-1).text, /repeated page trips/i);
+  assert.ok(c.run.snapshot().events.some((row) => row.type === 'credit_guard.refused'));
+});
+
+test('the app refuses a fifth navigation during one customer request', async (t) => {
+  const c = await setup(t);
+  await c.begin();
+  for (let index = 0; index < 4; index += 1) {
+    const result = await c.tool('browser_navigate', { url: c.start.home });
+    assert.equal(result.success, true);
+  }
+  const fifth = await c.tool('browser_navigate', { url: c.start.home });
+  assert.equal(fifth.success, false);
+  assert.match(fifth.error, /limit of four page navigations/i);
+  assert.equal(c.run.snapshot().steps.filter((step) => step.title.startsWith('Opened ')).length, 4);
+  assert.ok(c.run.snapshot().events.some((row) => row.type === 'credit_guard.navigation_limit'));
+});
+
 test('the browser is closed again when the session cannot be created', async (t) => {
   const c = await setup(t);
   await c.fixture.close();

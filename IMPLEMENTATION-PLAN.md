@@ -68,7 +68,7 @@ All are function tools executed by this app. There is no tool that runs JavaScri
 | Tool | Bounds |
 | --- | --- |
 | `browser_observe` | Returns the address, title, tab list, a capped text excerpt, and up to 120 visible interactive elements with short references. Never includes the value of any input. Refused on a website outside the allow-list. |
-| `browser_navigate(url)` | HTTPS only, host must be on the allow-list (`www.singtel.com`, `cast.singtel.com`, plus `ALLOWED_HOSTS`). |
+| `browser_navigate(url)` | HTTPS only, host must be on the allow-list (`www.singtel.com`, `cast.singtel.com`, configured hosts, or an approved domain suffix such as `singtel.com` / `gomo.sg`). |
 | `browser_click(ref)` | `ref` must come from the latest observation of the active tab and still be attached. Refused outside the allow-list. |
 | `browser_scroll(direction)` | `up` or `down`, one viewport step. |
 | `browser_switch_tab(tab_id)` | Must be an open tab. |

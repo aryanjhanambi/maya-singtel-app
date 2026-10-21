@@ -3,6 +3,7 @@ import { AgentsApiError } from './agents-api.js';
 import { BrowserError, BrowserSession } from './browser.js';
 import { buildSessionRequest } from './instructions.js';
 import { acceptedReplies, matchReply } from './replies.js';
+import { isCreditWasteRequest } from './credit-guard.js';
 import { CodeVault } from './secrets.js';
 import { isDrawerEvent, summarizeApiEvent } from './summarize.js';
 import { BROWSER_TOOLS, RESULT_OUTCOMES, TOOL } from './tools.js';
@@ -10,6 +11,7 @@ import { BROWSER_TOOLS, RESULT_OUTCOMES, TOOL } from './tools.js';
 const MAX_STORED_IMAGES = 240;
 const MAX_DRAWER_ROWS = 1500;
 const MAX_RECONNECT_ATTEMPTS = 5;
+const MAX_NAVIGATIONS_PER_MESSAGE = 4;
 const DEMO_START_URL = 'https://aryanjhanambi.github.io/singtel_demos/';
 
 // Where a drawer row or card comes from. Browser actions are executed by this
@@ -91,6 +93,8 @@ export class Run {
   #journalWarned = false;
   #autoTransitioning = false;
   #createBrowser;
+  #navigationsThisMessage = 0;
+  #navigationLimitNotified = false;
 
   constructor({ id = randomUUID(), ownerHash, config, api, journal, log = () => {}, createBrowser }) {
     this.id = id;
@@ -181,6 +185,7 @@ export class Run {
       activeCardId: this.#activeCard()?.id ?? null,
       castOrigin: this.config.castOrigin,
       allowedHosts: this.config.allowedHosts,
+      allowedHostSuffixes: this.config.allowedHostSuffixes,
       browser: this.browserState(),
     };
   }
@@ -361,8 +366,19 @@ export class Run {
         return;
       }
       if (active) await this.#answerCard(active, text);
-      else if (!this.sessionId) await this.#startSession(text);
-      else await this.#sendToMaya(text);
+      else if (isCreditWasteRequest(text)) {
+        this.#row(APP, 'credit_guard.refused', 'Repetitive or deliberate credit-wasting request refused before model submission');
+        this.#addEntry({
+          kind: 'maya',
+          key: this.#nextId('credit-guard'),
+          text: 'I can’t run repeated page trips that use credits without moving your AI Pass journey forward. I can continue the redemption process instead.',
+        });
+      } else {
+        this.#navigationsThisMessage = 0;
+        this.#navigationLimitNotified = false;
+        if (!this.sessionId) await this.#startSession(text);
+        else await this.#sendToMaya(text);
+      }
       this.#touch();
     });
   }
@@ -901,6 +917,20 @@ export class Run {
     if (blocked) {
       this.#row(APP, 'browser_tool.refused', `${call.name} refused after a submission`);
       return this.#deliver(call, { success: false, error: blocked });
+    }
+    if (call.name === TOOL.NAVIGATE) {
+      if (this.#navigationsThisMessage >= MAX_NAVIGATIONS_PER_MESSAGE) {
+        this.#row(APP, 'credit_guard.navigation_limit', 'Per-message browser navigation limit reached');
+        if (!this.#navigationLimitNotified) {
+          this.#navigationLimitNotified = true;
+          this.#notice('I stopped repeated page navigation to protect this session’s usage. Tell me the next step in your AI Pass journey.', 'warning');
+        }
+        return this.#deliver(call, {
+          success: false,
+          error: 'The app has reached its limit of four page navigations for this customer message. Do not try another route or repeat the navigation. Explain briefly and wait for the customer.',
+        });
+      }
+      this.#navigationsThisMessage += 1;
     }
     const titles = {
       [TOOL.OBSERVE]: 'Read the page',

@@ -52,6 +52,11 @@ export function readConfig(env = process.env) {
   const startUrl =
     value('START_URL') ??
     (demoMode ? SINGTEL_AI_PASS_URL : SINGTEL_AI_PASS_URL);
+  const allowedHostSuffixes = [
+    'singtel.com',
+    'gomo.sg',
+    ...(value('ALLOWED_HOST_SUFFIXES') ?? '').split(',').map((domain) => domain.trim().toLowerCase().replace(/^\*\./, '').replace(/^\./, '').replace(/\.$/, '')).filter(Boolean),
+  ];
   const publicHost = value('PUBLIC_HOST');
   const accessPassword = value('MAYA_ACCESS_PASSWORD');
   const turnstileSiteKey = value('CLOUDFLARE_TURNSTILE_SITE_KEY');
@@ -67,10 +72,9 @@ export function readConfig(env = process.env) {
     castOrigin: new URL(expectedRedeemUrl).origin,
     apiKey: value('OPENAI_API_KEY'),
     baseUrl,
-    // Sol evaluation build: keep this configurable so the same artifact can
-    // participate in A/B tests without changing application code.
-    model: value('OPENAI_AGENT_MODEL') ?? 'gpt-6.1-sol',
-    // GPT-6.1 Sol requires at least low reasoning when it uses tools.
+    // Luna evaluation build; Railway can override this with OPENAI_AGENT_MODEL.
+    model: value('OPENAI_AGENT_MODEL') ?? 'gpt-6-luna',
+    // Keep reasoning effort configurable for the selected model.
     reasoningEffort: value('OPENAI_REASONING_EFFORT') ?? 'low',
     host: value('HOST') ?? '127.0.0.1',
     publicHost,
@@ -91,6 +95,7 @@ export function readConfig(env = process.env) {
         ...(value('ALLOWED_HOSTS') ?? '').split(',').map((host) => host.trim()).filter(Boolean),
       ]),
     ],
+    allowedHostSuffixes: [...new Set(allowedHostSuffixes)],
     browserHeadless: value('BROWSER_HEADLESS')?.toLowerCase() !== 'false',
     // Leave the channel unset by default so Playwright uses its bundled
     // Chromium executable in local and container deployments.
@@ -144,8 +149,10 @@ export function isPrivateNetworkHost(hostname) {
 }
 
 /**
- * Whether Maya's tools may act on this address: HTTPS on an allow-listed
- * host. Plain HTTP is accepted only in test mode, for the local dev page.
+ * Whether Maya's tools may act on this address: HTTPS on an exact host or
+ * within an explicitly approved domain suffix. Suffix matching is label
+ * bounded (so `notgomo.sg` does not match `gomo.sg`) and rejects custom ports.
+ * Plain HTTP is accepted only in test mode, for the local dev page.
  */
 export function agentMayUse(address, config) {
   let url;
@@ -155,5 +162,10 @@ export function agentMayUse(address, config) {
     return false;
   }
   const secure = url.protocol === 'https:' || (config.testMode && url.protocol === 'http:');
-  return secure && (config.testMode || !isPrivateNetworkHost(url.hostname)) && config.allowedHosts.includes(url.host);
+  const exactHost = config.allowedHosts.includes(url.host);
+  const hostname = url.hostname.toLowerCase().replace(/\.$/, '');
+  const domainSuffix = !url.port && (config.allowedHostSuffixes ?? []).some(
+    (suffix) => hostname === suffix || hostname.endsWith(`.${suffix}`),
+  );
+  return secure && (config.testMode || !isPrivateNetworkHost(url.hostname)) && (exactHost || domainSuffix);
 }

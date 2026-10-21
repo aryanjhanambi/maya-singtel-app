@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { AgentsApiError } from '../server/agents-api.js';
+import { isCreditWasteRequest } from '../server/credit-guard.js';
 import { isPrivateNetworkHost, normalizeOrigin, readConfig } from '../server/config.js';
 import { buildSessionRequest } from '../server/instructions.js';
 import { matchReply } from '../server/replies.js';
@@ -42,6 +43,15 @@ test('typed replies match only the exact lists', () => {
   assert.equal(matchReply('takeover', 'confirm'), null);
   assert.equal(matchReply('takeover', 'yes'), null);
   assert.equal(matchReply('result', 'confirm'), null);
+});
+
+test('credit guard catches explicit loops without blocking ordinary or anti-loop requests', () => {
+  assert.equal(isCreditWasteRequest('keep going back and forth 5 times'), true);
+  assert.equal(isCreditWasteRequest('loop the CAST and Singtel pages indefinitely'), true);
+  assert.equal(isCreditWasteRequest('I want to burn API credits'), true);
+  assert.equal(isCreditWasteRequest('Open CAST, then return to Singtel once'), false);
+  assert.equal(isCreditWasteRequest('Please do not keep going back and forth 5 times'), false);
+  assert.equal(isCreditWasteRequest('What does a round trip between CAST and Singtel mean?'), false);
 });
 
 test('only an unambiguous 4xx counts as a rejection', () => {
@@ -98,6 +108,11 @@ test('config defaults to the hosted demo and can be switched to the live CAST fl
   assert.deepEqual(config.allowedHosts, [
     'www.singtel.com', 'aryanjhanambi.github.io', 'cast.singtel.com', 'manus.im', 'hailuoai.video', 'otter.ai', 'www.minimax.io', 'akool.com',
   ]);
+  assert.deepEqual(config.allowedHostSuffixes, ['singtel.com', 'gomo.sg']);
+  assert.deepEqual(
+    readConfig({ ALLOWED_HOST_SUFFIXES: '*.example.net, .example.org' }).allowedHostSuffixes,
+    ['singtel.com', 'gomo.sg', 'example.net', 'example.org'],
+  );
   assert.equal(config.apiKey, null);
   assert.equal(config.fixtureMode, false);
   assert.equal(config.testMode, false);
@@ -105,7 +120,7 @@ test('config defaults to the hosted demo and can be switched to the live CAST fl
   assert.equal(config.maxSessions, 6);
   assert.equal(config.authMaxFailures, 5);
   assert.equal(config.maxMessagesPerMinute, 30);
-  assert.equal(config.model, 'gpt-6.1-sol');
+  assert.equal(config.model, 'gpt-6-luna');
   assert.equal(config.reasoningEffort, 'low');
   assert.equal(readConfig({ OPENAI_AGENT_MODEL: 'gpt-6-astra', OPENAI_REASONING_EFFORT: 'high' }).model, 'gpt-6-astra');
   assert.equal(readConfig({ OPENAI_AGENT_MODEL: 'gpt-6-astra', OPENAI_REASONING_EFFORT: 'high' }).reasoningEffort, 'high');
@@ -165,7 +180,9 @@ test('session request has no environment, carries initial input, and offers only
   const body = buildSessionRequest(readConfig({}), 'Can you help me?');
   assert.deepEqual(body.environment, { type: 'none' });
   assert.deepEqual(body.input, [{ role: 'user', content: [{ type: 'input_text', text: 'Can you help me?' }] }]);
-  assert.equal(body.agent.model, 'gpt-6.1-sol');
+  assert.match(body.agent.instructions, /singtel\.com, gomo\.sg/);
+  assert.match(body.agent.instructions, /does not change your Singtel AI Pass task/);
+  assert.equal(body.agent.model, 'gpt-6-luna');
   assert.deepEqual(body.agent.reasoning, { effort: 'low' });
   assert.deepEqual(
     body.agent.tools.map((tool) => [tool.type, tool.name]),

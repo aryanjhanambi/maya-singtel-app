@@ -49,3 +49,15 @@
 - This broader work is not yet complete. The current safety instructions are an initial layer, not a comprehensive policy or a guarantee that every harmful request will be handled correctly.
 - The planned guardrails should block assistance that enables violence or terrorism, or promotes, targets, demeans, or excludes people based on protected traits, while still allowing appropriate educational, historical, prevention, news, and support conversations.
 - The work should also test repeated pressure, role-play, encoded or indirect requests, and malicious instructions embedded in webpages or other content; ensure the assistant does not invoke browser actions or other tools to carry out a disallowed request; and record what was tested and any known limitations.
+
+### 20 October 2026 — Added a guard against deliberate credit-wasting loops
+
+- Maya now recognizes clear requests to repeat page trips several times or indefinitely, and refuses them before sending the message to the AI service. This avoids paying for an AI response to an explicitly wasteful request.
+- The browser controller also allows at most four page navigations for one customer message, as a backstop if a repetitive loop is phrased indirectly or the AI tries to continue one.
+- The guard is intentionally narrow: ordinary questions about usage and the normal Singtel AI Pass journey are still allowed. It is not a substitute for account-level spending limits, traffic controls, or monitoring.
+
+### 21 October 2026 — Allowed approved Singtel and GOMO domains without listing every page
+
+- Maya's browser may now use HTTPS pages on `singtel.com` and `gomo.sg`, including subdomains such as the hi! app's `hiapp.singtel.com`. This avoids maintaining a separate URL for every page.
+- Matching is limited to the actual domain boundary, rejects lookalike names and custom ports, and still applies the existing HTTPS and private-address checks.
+- Maya's task instructions remain limited to the Singtel AI Pass journey. The broader page access can still expose more website text to the assistant, so prompt-injection testing and infrastructure egress controls remain important.

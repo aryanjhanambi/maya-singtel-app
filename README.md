@@ -1,8 +1,10 @@
-# Maya — GPT-6.1 Sol evaluation build
+# Maya — GPT-6 Luna evaluation build
 
-Maya helps a customer redeem Singtel AI Pass on the real CAST website. This branch evaluates GPT-6.1 Sol as the default model while retaining the same OpenAI Agents API orchestration, app-managed Chromium browser, Playwright tools, and customer takeover flow as the Astra build.
+Maya helps a customer redeem Singtel AI Pass on the real CAST website. This branch evaluates GPT-6 Luna as the default model while retaining the same OpenAI Agents API orchestration, app-managed Chromium browser, Playwright tools, and customer takeover flow as the Sol build.
 
 The model change is deliberately isolated to this branch. It does not alter the browser permissions, credential boundaries, code-release gate, or the main Astra deployment.
+
+For Railway, set `OPENAI_AGENT_MODEL=gpt-6-luna` in the service's Variables before redeploying. A previously configured `OPENAI_AGENT_MODEL` takes precedence over the code default.
 
 This repository supports a controlled pilot with up to six concurrent, isolated browser sessions by default. Local development listens on `127.0.0.1`; a public deployment requires the explicit production settings below. Browser automation uses custom function tools, not OpenAI-hosted `computer_use`.
 
@@ -93,7 +95,7 @@ Copy the template in [.env.example](.env.example). Never commit your local `.env
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `OPENAI_API_KEY` | none | OpenAI project API key |
-| `OPENAI_AGENT_MODEL` | `gpt-6.1-sol` | Model used by the agent session |
+| `OPENAI_AGENT_MODEL` | `gpt-6-luna` | Model used by the agent session; an existing Railway variable overrides this default |
 | `OPENAI_REASONING_EFFORT` | `low` | Reasoning effort used for agent turns |
 | `PUBLIC_HOST` | none | Exact public host; enables secure cookies and production configuration checks |
 | `MAYA_ACCESS_PASSWORD` | none | Access secret; public deployments require at least 16 characters |
@@ -104,6 +106,7 @@ Copy the template in [.env.example](.env.example). Never commit your local `.env
 | `START_URL` | Singtel AI Pass page | Initial navigation target |
 | `EXPECTED_REDEEM_URL` | CAST voucher redemption login | Expected redemption destination and permitted redemption origin |
 | `ALLOWED_HOSTS` | none | Additional hosts allowed for agent browser tools |
+| `ALLOWED_HOST_SUFFIXES` | `singtel.com,gomo.sg` | Additional HTTPS domains and their subdomains allowed for agent browser tools |
 | `BROWSER_HEADLESS` | `true` | Set to `false` to also show the Chromium window |
 | `BROWSER_CHANNEL` | `chromium` | Set to `chrome` to use installed Google Chrome |
 
